@@ -104,6 +104,16 @@ class H1VlessError extends Error {
 let cachedToken: string | null = null;
 let tokenFetchedAt = 0;
 
+/**
+ * Флаг «токен из env не работает».
+ *
+ * Нужен для живущих деплоев: если панель отозвала выданный при настройке
+ * токен, backend не должен молча умирать — у него есть логин и пароль,
+ * и он обязан сам переключиться на них. Один раз помечаем токен
+ * бракованным и дальше всегда берём новый через /auth/login.
+ */
+let envTokenRejected = false;
+
 /** Панель логинит редко; refresh не нужен, но подстрахуемся от залипания токена. */
 const TOKEN_REFRESH_MS = 30 * 60 * 1000;
 
@@ -131,6 +141,9 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
     // Токен протух — перелогиниваемся и повторяем ровно один раз.
     if (response.status === 401 || response.status === 403) {
+      // Токен из env, который сам не работает, больше не пробуем:
+      // если заданы логин и пароль, заходим через них.
+      if (token === H1VLESS_TOKEN()) envTokenRejected = true;
       cachedToken = null;
       token = await getToken(true);
       response = await send(token);
@@ -166,20 +179,30 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   }
 }
 
-/** Токен из env либо результат логина. Логин выполняется один раз на инстанс. */
+/**
+ * Токен для запросов: из env, из кэша или свежий логин.
+ *
+ * Порядок такой: пробуем готовый токен (он быстрее логина), но если панель
+ * его отвергла — переходим на логин. Это позволяет задать в окружении и
+ * токен, и пару: пока токен живой, лишнего запроса нет; когда он протухнет,
+ * backend сам себя починит, не требуя ручного вмешательства.
+ */
 async function getToken(force = false): Promise<string> {
-  const fromEnv = H1VLESS_TOKEN();
-  if (fromEnv) return fromEnv;
+  const username = H1VLESS_USERNAME();
+  const password = H1VLESS_PASSWORD();
+  const canLogin = Boolean(username && password);
 
   const now = Date.now();
   if (!force && cachedToken && now - tokenFetchedAt < TOKEN_REFRESH_MS) return cachedToken;
 
-  const username = H1VLESS_USERNAME();
-  const password = H1VLESS_PASSWORD();
-  if (!username || !password) {
+  const fromEnv = H1VLESS_TOKEN();
+  if (fromEnv && !envTokenRejected) return fromEnv;
+
+  if (!canLogin) {
+    // Ни логина, ни рабочего токена — это уже настройка, а не сбой.
     throw new H1VlessError(
       '/auth/login',
-      'не заданы H1VLESS_TOKEN или H1VLESS_USERNAME/H1VLESS_PASSWORD',
+      'не заданы H1VLESS_USERNAME/H1VLESS_PASSWORD, а H1VLESS_TOKEN не принят панелью',
     );
   }
 
