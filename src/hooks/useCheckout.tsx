@@ -15,6 +15,7 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type RefObject,
 } from 'react';
 import { createPayment, getPaymentStatus } from '@/api';
 import { toApiError, type ApiError } from '@/api/client';
@@ -31,6 +32,14 @@ interface CheckoutValue {
 
   /** Шаг 1: создать заказ. Возвращает созданный заказ или null. */
   begin: (plan: Plan) => Promise<Order | null>;
+  /**
+   * Последняя ошибка создания заказа.
+   *
+   * Отдельная ссылка, а не только `error` из состояния: React обновляет
+   * состояние асинхронно, и сразу после `await begin()` значение в
+   * замыкании компонента было бы ещё старым.
+   */
+  lastErrorRef: RefObject<ApiError | null>;
   /**
    * Передать выбранный тариф на экран подтверждения.
    * План живёт только в памяти — в URL он не попадает (ТЗ п. 10).
@@ -53,6 +62,9 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
   const [inProgress, setInProgress] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
 
+  /** Актуальная ошибка последнего `begin()` — см. комментарий в интерфейсе. */
+  const lastErrorRef = useRef<ApiError | null>(null);
+
   /**
    * Актуальный заказ в ref.
    *
@@ -68,6 +80,7 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
     setPlan(null);
     setInProgress(false);
     setError(null);
+    lastErrorRef.current = null;
   }, []);
 
   /** Запоминает выбранный тариф, чтобы экран подтверждения его показал. */
@@ -87,6 +100,7 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
  */
   const begin = useCallback(async (selected: Plan): Promise<Order | null> => {
     setError(null);
+    lastErrorRef.current = null;
     setInProgress(true);
     setPlan(selected);
 
@@ -96,7 +110,9 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
       setOrder(created);
       return created;
     } catch (e) {
-      setError(toApiError(e));
+      const apiError = toApiError(e);
+      lastErrorRef.current = apiError;
+      setError(apiError);
       return null;
     } finally {
       setInProgress(false);
@@ -167,6 +183,7 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
       plan,
       inProgress,
       error,
+      lastErrorRef,
       begin,
       selectPlan,
       pollOnce,

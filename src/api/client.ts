@@ -99,6 +99,8 @@ const ERROR_CODE_MESSAGES: Readonly<Record<string, string>> = {
   RATE_LIMITED: 'Слишком много запросов. Подождите немного.',
   VALIDATION_ERROR: 'Проверьте заполненные поля.',
   INVALID_REQUISITES: 'Укажите корректные реквизиты.',
+  // Backend отвечает этим кодом, пока приём оплаты выключен (PAYMENTS_ENABLED=false).
+  PAYMENT_UNAVAILABLE: 'Приём оплаты временно недоступен. Попробуйте позже.',
 };
 
 /**

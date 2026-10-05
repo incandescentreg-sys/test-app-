@@ -1,0 +1,193 @@
+// Схема данных backend'а Telegram Mini App «Яблоко VPN».
+//
+// Источник истины по доступу и срокам — панель H1VLESS.
+// Эта база хранит бизнес-состояние: кто пользователь, что купил,
+// кого пригласил, когда истекает подписка, какие заявки на вывод в работе.
+//
+// Деньги ВСЕГДА в копейках (целое число), чтобы не терять точность.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/* ── Пользователь ─────────────────────────────────────────────────────────── */
+
+model User {
+  id        String   @id @default(cuid())
+  /// Telegram user id. BigInt: значения не влезают в Int.
+  telegramId BigInt  @unique
+  username  String?
+  firstName String
+  lastName  String?
+  /// Ссылка на аватар t.me, если Telegram её отдал.
+  avatarUrl String?
+  languageCode String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Кто пригласил. Заполняется ТОЛЬКО из подписанного start_param.
+  referredById String?
+  referredBy   User?   @relation("UserReferrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals    User[]  @relation("UserReferrals")
+
+  subscription Subscription?
+  orders       Order[]
+  earnings     ReferralEarning[] @relation("EarningsReferrer")
+  withdrawals  Withdrawal[]
+
+  @@index([referredById])
+  @@map("users")
+}
+
+/* ── Тарифы ───────────────────────────────────────────────────────────────── */
+
+model Plan {
+  /// Например «plan-1m». Этот же id фронтенд присылает в POST /payments/create.
+  id           String  @id
+  name         String
+  durationDays Int
+  /// Цена в копейках.
+  price        Int
+  currency     String  @default("RUB")
+  pricePerMonth Int?
+  /// Цена «без скидки» — на её основе показывается выгода.
+  originalPrice Int?
+  badge        String?
+  description  String?
+  isPopular    Boolean @default(false)
+  available    Boolean @default(true)
+  sortOrder    Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders       Order[]
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+/* ── Подписка ─────────────────────────────────────────────────────────────── */
+
+model Subscription {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  planId String?
+  plan   Plan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
+  planName String?
+  durationDays Int?
+
+  startAt  DateTime?
+  expiresAt DateTime?
+
+  /// Заморожена администратором (задолженность, блокировка).
+  frozen   Boolean @default(false)
+  autoRenew Boolean @default(false)
+
+  /// Имя клиента в панели H1VLESS. По нему идёт продление и бан.
+  h1vlessName  String?
+  h1vlessUuid  String?
+  /// Конфигурация, кэшированная с панели. Обновляется при каждом чтении.
+  h1vlessLink  String?
+  h1vlessSubUrl String?
+  h1vlessSyncedAt DateTime?
+
+  /// Сколько раз клиент был продлён — для статистики и аудита.
+  renewCount Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([expiresAt])
+  @@map("subscriptions")
+}
+
+/* ── Заказы ───────────────────────────────────────────────────────────────── */
+
+model Order {
+  id     String @id /// Короткий публичный id вида «ord_7f3a91».
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  planId String?
+  plan   Plan?  @relation(fields: [planId], references: [id], onDelete: SetNull)
+  planName String
+  durationDays Int
+
+  /// Сумма, зафиксированная в момент заказа. Клиент её не присылает.
+  amount   Int
+  currency String  @default("RUB")
+
+  /// created | pending | paid | failed | expired | refunded | cancelled
+  status String  @default("created")
+
+  paymentUrl String?
+  /// Идентификатор платежа у провайдера.
+  provider    String?
+  providerRef String?
+
+  /// Продление ли это (была активная подписка) — для отчётности и рефералов.
+  isRenewal Boolean @default(false)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  expiresAt DateTime?
+  paidAt    DateTime?
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@map("orders")
+}
+
+/* ── Реферальные начисления ───────────────────────────────────────────────── */
+
+model ReferralEarning {
+  id         String  @id @default(cuid())
+  /// Кому начислено (пригласивший).
+  referrerId String
+  referrer   User    @relation("EarningsReferrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  /// Кто принёс покупку.
+  referredId String
+  orderId    String?
+
+  /// Сумма бонуса в копейках.
+  amount   Int
+  /// true — зачислено на доступный баланс; false — ещё в холде.
+  credited Boolean @default(false)
+  /// Начислено с покупки на сумму orderAmount.
+  orderAmount Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([referrerId, createdAt])
+  @@map("referral_earnings")
+}
+
+/* ── Заявки на вывод ──────────────────────────────────────────────────────── */
+
+model Withdrawal {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Сумма в копейках.
+  amount Int
+  /// pending | approved | paid | rejected | cancelled
+  status String @default("pending")
+  requisites String
+
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+  rejectionReason String?
+
+  @@index([userId, createdAt])
+  @@map("withdrawals")
+}

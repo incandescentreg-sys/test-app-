@@ -1,0 +1,30 @@
+node_modules
+dist
+dist-ssr
+.vercel
+.pglite
+e2e-report.txt
+*.local
+*.log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Никогда не коммитить реальные .env
+.env
+.env.*
+!.env.example
+!api/.env.example
+
+# Локальное окружение backend
+api/.env
+api/.env.*
+!api/.env.example
+
+.DS_Store
+Thumbs.db
+.idea
+.vscode/*
+!.vscode/extensions.json
+coverage
+*.tsbuildinfo

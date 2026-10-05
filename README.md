@@ -1,4 +1,14 @@
-﻿# Яблоко VPN — Telegram Mini App
+﻿# Яблоко VPN — Telegram Mini App + backend
+
+> **Обновлено:** в репозитории теперь есть backend. Он лежит в папке `api/`,
+> работает как Vercel Functions, хранит состояние в PostgreSQL (Prisma)
+> и выдаёт доступ через панель **H1VLESS**.
+> Инструкция по настройке — в **[`docs/BACKEND.md`](docs/BACKEND.md)**.
+
+<details>
+<summary>Описание только фронтенда (как было до)</summary>
+
+# Яблоко VPN — Telegram Mini App
 
 Telegram Mini App для VPN-сервиса. Это **только фронтенд**: он показывает данные,
 которые отдаёт существующий backend, и вызывает его API. Вся бизнес-логика,
@@ -554,4 +564,41 @@ Mini App рассчитывает на safe-area и `--tg-viewport-stable-height
 ## Лицензия
 
 Фронтенд готов к использованию. Бизнес-логика, платежи и управление H1VLESS
-остаются в вашем backend.
+реализованы в `api/`.
+
+</details>
+
+---
+
+## Backend в двух словах
+
+| Что | Где |
+| --- | --- |
+| Обработчики API | `api/` — Vercel Functions, TypeScript |
+| Схема данных | `prisma/schema.prisma` — пользователи, тарифы, подписки, заказы, рефералы |
+| Интеграция с VPN | `api/_lib/h1vless.ts` — REST API панели H1VLESS |
+| Переменные | `api/.env.example` |
+| Подробности | [`docs/BACKEND.md`](docs/BACKEND.md) |
+
+Ключевое: **панель H1VLESS — источник истины по сроку и доступу**, база хранит
+бизнес-состояние. Секреты (`BOT_TOKEN`, пароль панели, `ADMIN_SECRET`) живут
+только в env сервера и никогда не попадают в бандл фронтенда.
+
+Быстрый старт локально:
+
+```bash
+npm.cmd run db:local        # поднять Postgres (PGlite) в отдельном терминале
+
+$env:DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:5432/vpn?connection_limit=1&pgbouncer=true'
+npm.cmd run db:push         # создать таблицы
+npm.cmd run db:seed         # заполнить тарифы
+npm.cmd run dev:api         # поднять backend + статику на :3000
+```
+
+Проверки:
+
+```bash
+npm.cmd run test            # типы + тесты подписи Telegram
+npm.cmd run test:h1vless    # живой цикл create/extend/delete на панели
+npm.cmd run test:e2e        # сквозной тест всех маршрутов (нужна база)
+```

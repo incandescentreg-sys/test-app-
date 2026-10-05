@@ -28,7 +28,8 @@ type Phase = 'idle' | 'paying' | 'verifying' | 'failed';
 
 export default function CheckoutPage() {
   const { back, canGoBack, replace, reset } = useRouter();
-  const { begin, order, plan, pollOnce, pollUntilFinal, reset: resetCheckout } = useCheckout();
+  const { begin, order, plan, lastErrorRef, pollOnce, pollUntilFinal, reset: resetCheckout } =
+    useCheckout();
   const { setSubscription, refreshSubscription } = useSession();
   const toast = useToast();
 
@@ -62,6 +63,9 @@ export default function CheckoutPage() {
     //    новая это подписка или продление существующей.
     const created = await begin(plan);
     if (!created) {
+      // Текст ошибки приходит из useCheckout (ApiError) — backend уже
+      // вернул человеческое сообщение, например про недоступную оплату.
+      setFailure(lastErrorRef.current?.message ?? COPY.errors.paymentFailed);
       setPhase('failed');
       haptic.error();
       return;
