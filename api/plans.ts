@@ -6,10 +6,10 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { prepare, sendError, sendOk } from './_lib/http';
-import { listPlans } from './_lib/plans';
-import { requireAuth } from './_lib/telegram';
-import { touchUser } from './_lib/user';
+import { prepare, sendError, sendOk } from './_lib/http.ts';
+import { listPlans } from './_lib/plans.ts';
+import { requireAuth } from './_lib/telegram.ts';
+import { touchUser } from './_lib/user.ts';
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (prepare(req, res)) return;

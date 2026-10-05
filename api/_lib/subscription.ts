@@ -6,7 +6,7 @@
  */
 
 import type { Subscription } from '@prisma/client';
-import { DEVICE_LIMIT, EXPIRING_SOON_DAYS, TRAFFIC_LIMIT_GB } from './env';
+import { DEVICE_LIMIT, EXPIRING_SOON_DAYS, TRAFFIC_LIMIT_GB } from './env.ts';
 import {
   clientNameFor,
   fetchClient,
@@ -16,9 +16,9 @@ import {
   provisionClient,
   revokeClient,
   type H1VlessClient,
-} from './h1vless';
-import { log, logError } from './http';
-import { prisma } from './prisma';
+} from './h1vless.ts';
+import { log, logError } from './http.ts';
+import { prisma } from './prisma.ts';
 
 const MS_PER_DAY = 86_400_000;
 

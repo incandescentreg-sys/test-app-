@@ -3,9 +3,9 @@
  */
 
 import type { Plan, Subscription, User } from '@prisma/client';
-import { prisma } from './prisma';
-import { parseReferralId, type TelegramAuth } from './telegram';
-import { log } from './http';
+import { prisma } from './prisma.ts';
+import { parseReferralId, type TelegramAuth } from './telegram.ts';
+import { log } from './http.ts';
 
 /** Telegram отдаёт аватар через короткоживущую ссылку t.me/i/userpic — сохраняем её. */
 function avatarUrl(auth: TelegramAuth): string | null {

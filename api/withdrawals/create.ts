@@ -13,11 +13,11 @@
 
 import { randomBytes } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { CURRENCY, MIN_WITHDRAWAL_AMOUNT } from '../_lib/env';
-import { ApiError, prepare, readJson, sendError, sendOk, validation } from '../_lib/http';
-import { prisma } from '../_lib/prisma';
-import { requireAuth } from '../_lib/telegram';
-import { touchUser } from '../_lib/user';
+import { CURRENCY, MIN_WITHDRAWAL_AMOUNT } from '../_lib/env.ts';
+import { ApiError, prepare, readJson, sendError, sendOk, validation } from '../_lib/http.ts';
+import { prisma } from '../_lib/prisma.ts';
+import { requireAuth } from '../_lib/telegram.ts';
+import { touchUser } from '../_lib/user.ts';
 
 /** Сумма должна быть целым числом копеек и разумного размера. */
 function parseAmount(value: unknown): number {

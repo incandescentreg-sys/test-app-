@@ -6,18 +6,18 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { BOT_USERNAME } from './_lib/env';
-import { prepare, sendError, sendOk } from './_lib/http';
-import { prisma } from './_lib/prisma';
-import { referralLinkFor } from './_lib/referrals';
+import { BOT_USERNAME } from './_lib/env.ts';
+import { prepare, sendError, sendOk } from './_lib/http.ts';
+import { prisma } from './_lib/prisma.ts';
+import { referralLinkFor } from './_lib/referrals.ts';
 import {
   computeStatus,
   isActive,
   syncFromPanel,
   toSubscriptionDto,
-} from './_lib/subscription';
-import { requireAuth } from './_lib/telegram';
-import { loadBundle } from './_lib/user';
+} from './_lib/subscription.ts';
+import { requireAuth } from './_lib/telegram.ts';
+import { loadBundle } from './_lib/user.ts';
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (prepare(req, res)) return;

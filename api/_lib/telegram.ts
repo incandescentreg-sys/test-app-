@@ -15,8 +15,8 @@
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { VercelRequest } from '@vercel/node';
-import { BOT_TOKEN, INIT_DATA_MAX_AGE_SEC } from './env';
-import { unauthorized } from './http';
+import { BOT_TOKEN, INIT_DATA_MAX_AGE_SEC } from './env.ts';
+import { unauthorized } from './http.ts';
 
 /** Заголовок, в котором Mini App передаёт подписанные данные. */
 export const AUTH_HEADER = 'X-Telegram-Init-Data';

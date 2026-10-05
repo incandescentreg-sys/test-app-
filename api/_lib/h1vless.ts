@@ -28,8 +28,8 @@ import {
   H1VLESS_TIMEOUT_MS,
   H1VLESS_TOKEN,
   H1VLESS_USERNAME,
-} from './env';
-import { log, logError } from './http';
+} from './env.ts';
+import { log, logError } from './http.ts';
 
 /* ── Типы ответа панели ──────────────────────────────────────────────────── */
 
