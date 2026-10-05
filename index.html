@@ -56,6 +56,17 @@
   <body>
     <div id="root"></div>
     <div id="boot" aria-hidden="true"><div></div></div>
+
+    <!--
+      SDK Telegram WebApp — ОБЯЗАТЕЛЕН. Именно он создаёт window.Telegram.WebApp.
+      Без него приложение внутри Telegram не может получить initData и
+      показывает экран «Откройте через Telegram».
+
+      Подключаем обычным <script>, а не модулем, потому что SDK должен
+      выполниться раньше нашего кода. Он синхронный, так что к моменту
+      запуска main.tsx объект уже готов.
+    -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

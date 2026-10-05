@@ -2,7 +2,6 @@
   "name": "vpn-telegram-miniapp",
   "private": true,
   "version": "1.0.0",
-  "type": "module",
   "description": "Telegram Mini App «Яблоко VPN» + backend (Vercel Functions) с интеграцией H1VLESS",
   "scripts": {
     "dev": "vite",
