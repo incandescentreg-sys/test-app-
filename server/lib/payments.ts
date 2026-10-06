@@ -68,17 +68,20 @@ export async function createOrder(userId: string, planId: unknown): Promise<Orde
     throw new ApiError(400, 'VALIDATION_ERROR', 'Выберите тариф.');
   }
 
-  const plan = await findPlan(planId);
-  if (!plan) throw new ApiError(422, 'PLAN_UNAVAILABLE', 'Этот тариф сейчас недоступен. Выберите другой.');
-
+  // Проверка «оплата выключена» идёт ДО поиска тарифа. Иначе при пустой
+  // таблице тарифов клиент получал бы 422 «тариф недоступен» вместо
+  // честного «приём оплаты временно недоступен» — а это разные вещи:
+  // тариф может пропасть и при включённой оплате.
   if (!PAYMENTS_ENABLED()) {
-    // Честный отказ: лучше «временно недоступно», чем оплата в никуда.
     throw new ApiError(
       503,
       'PAYMENT_UNAVAILABLE',
       'Приём оплаты временно недоступен. Попробуйте позже.',
     );
   }
+
+  const plan = await findPlan(planId);
+  if (!plan) throw new ApiError(422, 'PLAN_UNAVAILABLE', 'Этот тариф сейчас недоступен. Выберите другой.');
 
   // Не даём плодить заказы: один незавершённый заказ на пользователя.
   const existing = await prisma.order.findFirst({
