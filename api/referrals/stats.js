@@ -262,12 +262,23 @@ function validateInitData(initData) {
   const dataCheckString = pairs.map(([key, value]) => `${key}=${value}`).join("\n");
   const tokens = [BOT_TOKEN(), ...BOT_TOKEN_FALLBACKS()];
   let matched = false;
+  let hashOverPrefixedString = false;
   for (const token of tokens) {
     const secret = createHmac("sha256", "WebAppData").update(token).digest();
     const expected = createHmac("sha256", secret).update(dataCheckString).digest("hex");
     if (safeEqual(expected, hash)) {
       matched = true;
       break;
+    }
+    const botId = token.split(":")[0] ?? "";
+    if (botId) {
+      const withPrefix = thirdPartyDataCheckString(botId, pairs);
+      const prefixed = createHmac("sha256", secret).update(withPrefix).digest("hex");
+      if (safeEqual(prefixed, hash)) {
+        matched = true;
+        hashOverPrefixedString = true;
+        break;
+      }
     }
   }
   if (!matched) {
@@ -286,6 +297,7 @@ function validateInitData(initData) {
       // Имена полей подобраны так, чтобы фильтр масок в log() их не съел:
       // он отбрасывает всё, что содержит key, token, url, secret.
       telegramSignature: ed25519,
+      hashStyle: hashOverPrefixedString ? "\u0441 \u043F\u0440\u0435\u0444\u0438\u043A\u0441\u043E\u043C bot_id" : "\u0442\u043E\u043B\u044C\u043A\u043E \u043F\u043E\u043B\u044F",
       candidates: tokens.length
     });
     throw unauthorized();

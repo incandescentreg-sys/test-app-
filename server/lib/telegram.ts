@@ -146,13 +146,32 @@ export function validateInitData(initData: string): TelegramAuth {
   // «сессия истекла», хотя новый токен уже выдан.
   const tokens = [BOT_TOKEN(), ...BOT_TOKEN_FALLBACKS()];
   let matched = false;
+  // Какой из двух вариантов строки совпал с hash — для диагностики.
+  let hashOverPrefixedString = false;
 
   for (const token of tokens) {
     const secret = createHmac('sha256', 'WebAppData').update(token).digest();
+
+    // Основной вариант: только поля initData.
     const expected = createHmac('sha256', secret).update(dataCheckString).digest('hex');
     if (safeEqual(expected, hash)) {
       matched = true;
       break;
+    }
+
+    // Запасной вариант: Telegram считает hash по строке сторонней
+    // валидации, где в начале "<bot_id>:WebAppData" и перевод строки.
+    // Так делают клиенты, которым не нужен токен бота, и такой формат
+    // подтверждается полем signature.
+    const botId = token.split(':')[0] ?? '';
+    if (botId) {
+      const withPrefix = thirdPartyDataCheckString(botId, pairs);
+      const prefixed = createHmac('sha256', secret).update(withPrefix).digest('hex');
+      if (safeEqual(prefixed, hash)) {
+        matched = true;
+        hashOverPrefixedString = true;
+        break;
+      }
     }
   }
 
@@ -179,6 +198,7 @@ export function validateInitData(initData: string): TelegramAuth {
       // Имена полей подобраны так, чтобы фильтр масок в log() их не съел:
       // он отбрасывает всё, что содержит key, token, url, secret.
       telegramSignature: ed25519,
+      hashStyle: hashOverPrefixedString ? 'с префиксом bot_id' : 'только поля',
       candidates: tokens.length,
     });
     throw unauthorized();
