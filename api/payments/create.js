@@ -236,6 +236,8 @@ function validateInitData(initData) {
   if (!matched) {
     log("telegram", "\u043F\u043E\u0434\u043F\u0438\u0441\u044C \u043D\u0435 \u0441\u043E\u0432\u043F\u0430\u043B\u0430 \u043D\u0438 \u0441 \u043E\u0434\u043D\u0438\u043C \u0442\u043E\u043A\u0435\u043D\u043E\u043C", {
       fields: pairs.map(([key]) => key).sort(),
+      queryIdPrefix: (params.get("query_id") ?? "").slice(0, 12),
+      expectedBotIds: tokens.map((token) => token.split(":")[0]).filter(Boolean).join(","),
       knownTokens: tokens.length
     });
     throw unauthorized();

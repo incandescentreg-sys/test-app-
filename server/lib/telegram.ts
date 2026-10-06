@@ -88,8 +88,15 @@ export function validateInitData(initData: string): TelegramAuth {
 
   if (!matched) {
     // Логируем только форму запроса: ни подпись, ни токен в лог не попадают.
+    // Префикс query_id полезен при разборе: по нему видно, каким ботом
+    // подписаны данные, — сам query_id секретом не является.
     log('telegram', 'подпись не совпала ни с одним токеном', {
       fields: pairs.map(([key]) => key).sort(),
+      queryIdPrefix: (params.get('query_id') ?? '').slice(0, 12),
+      expectedBotIds: tokens
+        .map((token) => token.split(':')[0])
+        .filter(Boolean)
+        .join(','),
       knownTokens: tokens.length,
     });
     throw unauthorized();
