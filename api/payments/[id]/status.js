@@ -151,8 +151,44 @@ async function loadOrderStatus(userId, orderId) {
 }
 
 // server/lib/telegram.ts
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, createPublicKey, timingSafeEqual, verify as verifySignature } from "node:crypto";
 var AUTH_HEADER = "X-Telegram-Init-Data";
+var TELEGRAM_PUBLIC_KEYS = {
+  production: "e7bf03a2fa4602af4580703d88dda5bb59f32ed8b02a56c187fe7d34caed242d",
+  test: "40055058a4ee38156a06562e52eece92a771bcd8346a8c4615cb7376eddf72ec"
+};
+var SPKI_ED25519_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
+function thirdPartyDataCheckString(botId, fields) {
+  const body = fields.map(([key, value]) => `${key}=${value}`).join("\n");
+  return `${botId}:WebAppData
+${body}`;
+}
+function buildEd25519Key(hexKey) {
+  try {
+    return createPublicKey({
+      key: Buffer.concat([SPKI_ED25519_PREFIX, Buffer.from(hexKey, "hex")]),
+      format: "der",
+      type: "spki"
+    });
+  } catch {
+    return null;
+  }
+}
+function verifyWithTelegramKey(botId, fields, signature) {
+  if (!signature) return "absent";
+  const payload = Buffer.from(thirdPartyDataCheckString(botId, fields), "utf8");
+  const signatureBytes = Buffer.from(signature, "base64url");
+  for (const hexKey of Object.values(TELEGRAM_PUBLIC_KEYS)) {
+    const key = buildEd25519Key(hexKey);
+    if (!key) continue;
+    try {
+      if (verifySignature(null, payload, key, signatureBytes)) return "ok";
+    } catch {
+      return "unsupported";
+    }
+  }
+  return "mismatch";
+}
 function safeEqual(a, b) {
   const bufA = Buffer.from(a, "utf8");
   const bufB = Buffer.from(b, "utf8");
@@ -164,6 +200,7 @@ function validateInitData(initData) {
   const params = new URLSearchParams(initData);
   const hash = params.get("hash");
   if (!hash) throw unauthorized();
+  const signature = params.get("signature");
   params.delete("hash");
   params.delete("signature");
   const pairs = [...params.entries()].sort((left, right) => left[0].localeCompare(right[0]));
@@ -179,11 +216,19 @@ function validateInitData(initData) {
     }
   }
   if (!matched) {
+    const botIds = tokens.map((token) => token.split(":")[0] ?? "").filter((botId) => botId.length > 0);
+    let ed25519 = "absent";
+    for (const botId of botIds) {
+      ed25519 = verifyWithTelegramKey(botId, pairs, signature);
+      if (ed25519 === "ok") break;
+    }
     log("telegram", "\u043F\u043E\u0434\u043F\u0438\u0441\u044C \u043D\u0435 \u0441\u043E\u0432\u043F\u0430\u043B\u0430 \u043D\u0438 \u0441 \u043E\u0434\u043D\u0438\u043C \u0442\u043E\u043A\u0435\u043D\u043E\u043C", {
       fields: pairs.map(([key]) => key).sort(),
       queryIdPrefix: (params.get("query_id") ?? "").slice(0, 12),
-      expectedBotIds: tokens.map((token) => token.split(":")[0]).filter(Boolean).join(","),
-      knownTokens: tokens.length
+      expectedBotIds: botIds.join(","),
+      knownTokens: tokens.length,
+      signatureField: signature ? "\u0435\u0441\u0442\u044C" : "\u043D\u0435\u0442",
+      telegramKey: ed25519
     });
     throw unauthorized();
   }

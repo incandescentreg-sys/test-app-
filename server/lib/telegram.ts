@@ -13,13 +13,79 @@
  * функции живут в обычных Node-функциях Vercel.
  */
 
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, createPublicKey, timingSafeEqual, verify as verifySignature, type KeyObject } from 'node:crypto';
 import type { VercelRequest } from '@vercel/node';
 import { BOT_TOKEN, BOT_TOKEN_FALLBACKS, INIT_DATA_MAX_AGE_SEC } from './env.js';
 import { log, unauthorized } from './http.js';
 
 /** Заголовок, в котором Mini App передаёт подписанные данные. */
 export const AUTH_HEADER = 'X-Telegram-Init-Data';
+
+/**
+ * Публичные ключи Telegram для проверки поля `signature` (сторонняя
+ * валидация, Bot API 7.0+). Позволяют убедиться, что данные подписал
+ * Telegram, не имея токена бота, — полезно как независимая проверка и
+ * как страховка на рассинхронизацию токена при ротации.
+ */
+const TELEGRAM_PUBLIC_KEYS: Record<string, string> = {
+  production: 'e7bf03a2fa4602af4580703d88dda5bb59f32ed8b02a56c187fe7d34caed242d',
+  test: '40055058a4ee38156a06562e52eece92a771bcd8346a8c4615cb7376eddf72ec',
+};
+
+/** Префикс SPKI-DER для 32-байтового открытого ключа Ed25519. */
+const SPKI_ED25519_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
+
+/**
+ * Строка для сторонней валидации отличается от боевой: в начало
+ * добавляются `<bot_id>:WebAppData` и перевод строки. Именно поэтому
+ * проверка по токену и проверка по подписи Telegram — разные вещи,
+ * и совпадение одной не доказывает корректность другой.
+ */
+function thirdPartyDataCheckString(botId: string, fields: Array<[string, string]>): string {
+  const body = fields.map(([key, value]) => `${key}=${value}`).join('\n');
+  return `${botId}:WebAppData\n${body}`;
+}
+
+function buildEd25519Key(hexKey: string): KeyObject | null {
+  try {
+    return createPublicKey({
+      key: Buffer.concat([SPKI_ED25519_PREFIX, Buffer.from(hexKey, 'hex')]),
+      format: 'der',
+      type: 'spki',
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Проверка подписи Telegram публичным ключом.
+ *
+ * Возвращает 'ok' | 'mismatch' | 'absent' | 'unsupported':
+ * 'absent' — Telegram не прислал поле signature;
+ * 'unsupported' — среда не умеет Ed25519 (тогда полагаемся на HMAC).
+ */
+export function verifyWithTelegramKey(
+  botId: string,
+  fields: Array<[string, string]>,
+  signature: string | null,
+): 'ok' | 'mismatch' | 'absent' | 'unsupported' {
+  if (!signature) return 'absent';
+
+  const payload = Buffer.from(thirdPartyDataCheckString(botId, fields), 'utf8');
+  const signatureBytes = Buffer.from(signature, 'base64url');
+
+  for (const hexKey of Object.values(TELEGRAM_PUBLIC_KEYS)) {
+    const key = buildEd25519Key(hexKey);
+    if (!key) continue;
+    try {
+      if (verifySignature(null, payload, key, signatureBytes)) return 'ok';
+    } catch {
+      return 'unsupported';
+    }
+  }
+  return 'mismatch';
+}
 
 export interface TelegramUser {
   id: number;
@@ -62,8 +128,12 @@ export function validateInitData(initData: string): TelegramAuth {
   const params = new URLSearchParams(initData);
   const hash = params.get('hash');
   if (!hash) throw unauthorized();
+
+  // Поле для сторонней валидации не входит в data_check_string, но нужно
+  // его сохранить: по нему проверяем подпись публичным ключом Telegram.
+  const signature = params.get('signature');
+
   params.delete('hash');
-  // Ключ подписи не должен участвовать в data_check_string.
   params.delete('signature');
 
   // Сортировка пар по ключу — требование Telegram к data_check_string.
@@ -87,17 +157,26 @@ export function validateInitData(initData: string): TelegramAuth {
   }
 
   if (!matched) {
-    // Логируем только форму запроса: ни подпись, ни токен в лог не попадают.
-    // Префикс query_id полезен при разборе: по нему видно, каким ботом
-    // подписаны данные, — сам query_id секретом не является.
+    // Проверяем подпись публичным ключом Telegram. Это независимая
+    // проверка: она говорит, подписаны ли данные нашим ботом, даже если
+    // токен в окружении не тот. Раз результата не знаем заранее,
+    // вердикт попадает в лог вместе с формой запроса.
+    const botIds = tokens
+      .map((token) => token.split(':')[0] ?? '')
+      .filter((botId) => botId.length > 0);
+    let ed25519: string = 'absent';
+    for (const botId of botIds) {
+      ed25519 = verifyWithTelegramKey(botId, pairs, signature);
+      if (ed25519 === 'ok') break;
+    }
+
     log('telegram', 'подпись не совпала ни с одним токеном', {
       fields: pairs.map(([key]) => key).sort(),
       queryIdPrefix: (params.get('query_id') ?? '').slice(0, 12),
-      expectedBotIds: tokens
-        .map((token) => token.split(':')[0])
-        .filter(Boolean)
-        .join(','),
+      expectedBotIds: botIds.join(','),
       knownTokens: tokens.length,
+      signatureField: signature ? 'есть' : 'нет',
+      telegramKey: ed25519,
     });
     throw unauthorized();
   }
