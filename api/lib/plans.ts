@@ -7,7 +7,7 @@
  */
 
 import type { Plan } from '@prisma/client';
-import { prisma } from './prisma.ts';
+import { prisma } from './prisma.js';
 
 export interface PlanDto {
   id: string;

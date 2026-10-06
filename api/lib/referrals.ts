@@ -9,9 +9,9 @@
  *    вывести дважды.
  */
 
-import { prisma } from './prisma.ts';
-import { REFERRAL_BONUS_PERCENT } from './env.ts';
-import { log } from './http.ts';
+import { prisma } from './prisma.js';
+import { REFERRAL_BONUS_PERCENT } from './env.js';
+import { log } from './http.js';
 
 /** Ключ реферальной ссылки: t.me/<bot>?start=ref_<telegramId>. */
 export function referralLinkFor(botUsername: string, telegramId: number): string {

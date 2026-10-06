@@ -9,7 +9,7 @@
  */
 
 import { createHmac } from 'node:crypto';
-import { validateInitData, parseReferralId } from '../api/_lib/telegram.ts';
+import { validateInitData, parseReferralId } from '../api/lib/telegram.ts';
 
 const BOT_TOKEN = '7123456789:AAHfakeTokenForTestsOnly000';
 

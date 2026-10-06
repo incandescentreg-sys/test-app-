@@ -11,10 +11,10 @@
  * Повторный запуск с тем же id ПРОДЛЕВАЕТ подписку, а не создаёт вторую.
  */
 
-import { prisma } from '../api/_lib/prisma.ts';
-import { clientNameFor, fetchClient } from '../api/_lib/h1vless.ts';
-import { findPlan } from '../api/_lib/plans.ts';
-import { grantAccess } from '../api/_lib/subscription.ts';
+import { prisma } from '../api/lib/prisma.ts';
+import { clientNameFor, fetchClient } from '../api/lib/h1vless.ts';
+import { findPlan } from '../api/lib/plans.ts';
+import { grantAccess } from '../api/lib/subscription.ts';
 
 const [rawId, planId = 'plan-1m', rawDays] = process.argv.slice(2);
 

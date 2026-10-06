@@ -2,6 +2,7 @@
   "name": "vpn-telegram-miniapp",
   "private": true,
   "version": "1.0.0",
+  "type": "module",
   "description": "Telegram Mini App «Яблоко VPN» + backend (Vercel Functions) с интеграцией H1VLESS",
   "scripts": {
     "dev": "vite",
@@ -22,7 +23,8 @@
     "db:local": "tsx scripts/db-local.ts",
     "test:e2e": "tsx --env-file=api/.env scripts/test-e2e.ts",
     "provision": "tsx --env-file=api/.env scripts/provision.ts",
-    "check:token": "tsx --env-file=api/.env scripts/check-token.ts"
+    "check:token": "tsx --env-file=api/.env scripts/check-token.ts",
+    "verify:runtime": "tsx scripts/verify-runtime.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

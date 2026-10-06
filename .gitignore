@@ -3,6 +3,7 @@ dist
 dist-ssr
 .vercel
 .pglite
+.verify-runtime
 e2e-report.txt
 *.local
 *.log

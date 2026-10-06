@@ -18,12 +18,12 @@
 
 import { timingSafeEqual } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { prepare, readJson, sendError, sendOk, unauthorized, validation } from '../_lib/http.ts';
-import { findPlan } from '../_lib/plans.ts';
-import { prisma } from '../_lib/prisma.ts';
-import { clientNameFor, fetchClient } from '../_lib/h1vless.ts';
-import { grantAccess } from '../_lib/subscription.ts';
-import { ADMIN_SECRET } from '../_lib/env.ts';
+import { prepare, readJson, sendError, sendOk, unauthorized, validation } from '../lib/http.js';
+import { findPlan } from '../lib/plans.js';
+import { prisma } from '../lib/prisma.js';
+import { clientNameFor, fetchClient } from '../lib/h1vless.js';
+import { grantAccess } from '../lib/subscription.js';
+import { ADMIN_SECRET } from '../lib/env.js';
 
 function secretMatches(provided: unknown): boolean {
   const expected = ADMIN_SECRET();

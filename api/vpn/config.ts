@@ -10,10 +10,10 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ApiError, prepare, sendError, sendOk } from '../_lib/http.ts';
-import { buildVpnConfig, computeStatus, isActive, syncFromPanel } from '../_lib/subscription.ts';
-import { requireAuth } from '../_lib/telegram.ts';
-import { loadBundle } from '../_lib/user.ts';
+import { ApiError, prepare, sendError, sendOk } from '../lib/http.js';
+import { buildVpnConfig, computeStatus, isActive, syncFromPanel } from '../lib/subscription.js';
+import { requireAuth } from '../lib/telegram.js';
+import { loadBundle } from '../lib/user.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (prepare(req, res)) return;

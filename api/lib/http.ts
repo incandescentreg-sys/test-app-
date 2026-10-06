@@ -6,7 +6,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ALLOWED_ORIGINS } from './env.ts';
+import { ALLOWED_ORIGINS } from './env.js';
 
 /* ── Ошибки ──────────────────────────────────────────────────────────────── */
 

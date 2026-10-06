@@ -12,12 +12,12 @@
 
 import { randomBytes } from 'node:crypto';
 import type { Order, Subscription } from '@prisma/client';
-import { ORDER_TTL_MINUTES, PAYMENTS_ENABLED } from './env.ts';
-import { ApiError, log } from './http.ts';
-import { findPlan } from './plans.ts';
-import { prisma } from './prisma.ts';
-import { computeStatus, grantAccess, isActive } from './subscription.ts';
-import { creditReferralForOrder } from './referrals.ts';
+import { ORDER_TTL_MINUTES, PAYMENTS_ENABLED } from './env.js';
+import { ApiError, log } from './http.js';
+import { findPlan } from './plans.js';
+import { prisma } from './prisma.js';
+import { computeStatus, grantAccess, isActive } from './subscription.js';
+import { creditReferralForOrder } from './referrals.js';
 
 /** Короткий публичный id заказа. Не пересекается с внутренними cuid. */
 function newOrderId(): string {

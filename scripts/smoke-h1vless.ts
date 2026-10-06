@@ -24,7 +24,7 @@ import {
   fetchStatus,
   parseHostPort,
   pickLink,
-} from '../api/_lib/h1vless.ts';
+} from '../api/lib/h1vless.ts';
 
 const probe = `tg_smoke_${Date.now().toString(36)}`;
 

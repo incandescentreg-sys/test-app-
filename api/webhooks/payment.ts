@@ -18,10 +18,10 @@
 
 import { timingSafeEqual } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { WEBHOOK_SECRET } from '../_lib/env.ts';
-import { ApiError, prepare, readJson, sendError, sendOk, unauthorized, validation } from '../_lib/http.ts';
-import { settleOrder } from '../_lib/payments.ts';
-import { prisma } from '../_lib/prisma.ts';
+import { WEBHOOK_SECRET } from '../lib/env.js';
+import { ApiError, prepare, readJson, sendError, sendOk, unauthorized, validation } from '../lib/http.js';
+import { settleOrder } from '../lib/payments.js';
+import { prisma } from '../lib/prisma.js';
 
 /** Сравнение секрета за постоянное время. Пустой WEBHOOK_SECRET закрывает маршрут. */
 function secretMatches(provided: unknown): boolean {

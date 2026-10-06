@@ -27,8 +27,8 @@ import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 
-import { prisma } from '../api/_lib/prisma.ts';
-import { clientNameFor } from '../api/_lib/h1vless.ts';
+import { prisma } from '../api/lib/prisma.ts';
+import { clientNameFor } from '../api/lib/h1vless.ts';
 import { createDevResponse } from './_devResponse.ts';
 
 const BOT_TOKEN = process.env.BOT_TOKEN ?? '';

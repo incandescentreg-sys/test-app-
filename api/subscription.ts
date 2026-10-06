@@ -5,10 +5,10 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { prepare, sendError, sendOk } from './_lib/http.ts';
-import { syncFromPanel, toSubscriptionDto } from './_lib/subscription.ts';
-import { requireAuth } from './_lib/telegram.ts';
-import { loadBundle } from './_lib/user.ts';
+import { prepare, sendError, sendOk } from './lib/http.js';
+import { syncFromPanel, toSubscriptionDto } from './lib/subscription.js';
+import { requireAuth } from './lib/telegram.js';
+import { loadBundle } from './lib/user.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (prepare(req, res)) return;

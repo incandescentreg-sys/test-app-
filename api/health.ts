@@ -13,8 +13,8 @@ import {
   PAYMENTS_ENABLED,
   REFERRAL_BONUS_PERCENT,
   SUPPORT_USERNAME,
-} from './_lib/env.ts';
-import { prepare, sendError, sendOk } from './_lib/http.ts';
+} from './lib/env.js';
+import { prepare, sendError, sendOk } from './lib/http.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (prepare(req, res)) return;
