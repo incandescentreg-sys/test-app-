@@ -5,7 +5,6 @@
 
 import { useEffect, type ReactNode } from 'react';
 import { BottomNavigation } from '@/components/BottomNavigation';
-import { DebugInsets } from '@/components/DebugInsets';
 import { FULLSCREEN_ROUTES, useRouter } from '@/lib/router';
 import { hideBackButton, setClosingGuard, showBackButton, syncViewportVars } from '@/lib/telegram';
 
@@ -62,7 +61,6 @@ export function AppShell({ children }: AppShellProps) {
       </div>
 
       {showNav && <BottomNavigation />}
-      <DebugInsets />
     </div>
   );
 }
