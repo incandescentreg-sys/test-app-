@@ -28,7 +28,8 @@
     "build:functions": "tsx scripts/build-functions.ts",
     "verify": "npm run typecheck && npm run typecheck:api && npm run test:initdata",
     "test:prod": "tsx scripts/test-prod.ts",
-    "db:seed:prod": "tsx scripts/seed.ts"
+    "db:seed:prod": "tsx scripts/seed.ts",
+    "check:auth": "tsx scripts/check-auth.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
