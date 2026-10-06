@@ -216,13 +216,33 @@ export function syncViewportVars(): void {
     if (stable) setVar('--tg-viewport-stable-height', `${stable}px`);
     if (wa.viewportHeight) setVar('--tg-viewport-height', `${wa.viewportHeight}px`);
 
-    // Safe area: часть клиентов не отдаёт CSS-переменные — читаем из insets.
+    // Safe area. Приложение разворачивается на весь экран (expand), поэтому
+    // контент заходит под служебную шапку Telegram. Отступ, который она
+    // требует, Telegram сообщает CSS-переменной
+    // --tg-content-safe-area-inset-top: игнорировать её нельзя, иначе наша
+    // шапка наезжает на кнопку закрытия.
     const meta = readViewportInsets();
-    setVar('--safe-top', `${Math.max(0, meta.top)}px`);
-    setVar('--safe-bottom', `${Math.max(0, meta.bottom)}px`);
+    setVar('--safe-top', `${Math.max(meta.top, readTelegramInset('--tg-content-safe-area-inset-top'))}px`);
+    setVar(
+      '--safe-bottom',
+      `${Math.max(meta.bottom, readTelegramInset('--tg-content-safe-area-inset-bottom'))}px`,
+    );
   } catch (error) {
     logger.error(SCOPE, error);
   }
+}
+
+/**
+ * Значение CSS-переменной Telegram в пикселях.
+ *
+ * Переменная может отсутствовать (Telegram Desktop, старые клиенты) —
+ * тогда возвращается 0, и отступ берётся из запасного источника.
+ */
+function readTelegramInset(name: string): number {
+  if (typeof window === 'undefined') return 0;
+  const raw = window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const value = Number.parseFloat(raw);
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
 function readViewportInsets(): { top: number; bottom: number } {

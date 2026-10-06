@@ -85,8 +85,8 @@
      последний элемент не уезжал под «пузырьки». */
   --nav-h: 75px;
   --gutter: 16px;
-  --safe-top: 0px;
-  --safe-bottom: 0px;
+  --safe-top: var(--tg-content-safe-area-inset-top, 0px);
+  --safe-bottom: var(--tg-content-safe-area-inset-bottom, 0px);
   --viewport-h: 100dvh;
 
   /* Скорость анимаций — быстро (п. 22) */
