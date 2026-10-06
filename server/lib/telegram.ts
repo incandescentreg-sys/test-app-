@@ -176,7 +176,10 @@ export function validateInitData(initData: string): TelegramAuth {
       expectedBotIds: botIds.join(','),
       knownTokens: tokens.length,
       signatureField: signature ? 'есть' : 'нет',
-      telegramKey: ed25519,
+      // Имена полей подобраны так, чтобы фильтр масок в log() их не съел:
+      // он отбрасывает всё, что содержит key, token, url, secret.
+      telegramSignature: ed25519,
+      candidates: tokens.length,
     });
     throw unauthorized();
   }

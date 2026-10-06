@@ -37,13 +37,19 @@ var ApiError = class extends Error {
 var unauthorized = (message = "\u0421\u0435\u0441\u0441\u0438\u044F \u0438\u0441\u0442\u0435\u043A\u043B\u0430. \u041F\u0435\u0440\u0435\u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435.") => new ApiError(401, "UNAUTHORIZED", message);
 var validation = (message = "\u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0437\u0430\u043F\u043E\u043B\u043D\u0435\u043D\u043D\u044B\u0435 \u043F\u043E\u043B\u044F.") => new ApiError(400, "VALIDATION_ERROR", message);
 var methodNotAllowed = () => new ApiError(405, "METHOD_NOT_ALLOWED", "\u041C\u0435\u0442\u043E\u0434 \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F.");
+var SENSITIVE_FIELD = /init_?data|token|secret|password|link|url|uuid|key/i;
 function log(scope, message, extra) {
   const safe = {};
+  const dropped = [];
   for (const [key, value] of Object.entries(extra ?? {})) {
-    if (/init_?data|token|secret|password|link|url|uuid|key/i.test(key)) continue;
+    if (SENSITIVE_FIELD.test(key)) {
+      dropped.push(key);
+      continue;
+    }
     safe[key] = value;
   }
   console.info(`[${scope}] ${message}`, Object.keys(safe).length > 0 ? safe : "");
+  if (dropped.length > 0) console.info(`[${scope}] \u0441\u043A\u0440\u044B\u0442\u043E \u043F\u043E\u043B\u0435\u0439 \u043F\u043E \u043C\u0430\u0441\u043A\u0435: ${dropped.join(", ")}`);
 }
 function logError(scope, message, error) {
   const detail = error instanceof Error ? error.message : String(error);
@@ -228,7 +234,10 @@ function validateInitData(initData) {
       expectedBotIds: botIds.join(","),
       knownTokens: tokens.length,
       signatureField: signature ? "\u0435\u0441\u0442\u044C" : "\u043D\u0435\u0442",
-      telegramKey: ed25519
+      // Имена полей подобраны так, чтобы фильтр масок в log() их не съел:
+      // он отбрасывает всё, что содержит key, token, url, secret.
+      telegramSignature: ed25519,
+      candidates: tokens.length
     });
     throw unauthorized();
   }

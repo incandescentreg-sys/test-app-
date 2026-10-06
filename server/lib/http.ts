@@ -59,15 +59,29 @@ export const unavailable = (message = 'Сервис временно недос�
 /**
  * Лог с маскированием. Никогда не пишем в лог:
  * initData, vless://, sub_url, токены панели.
+ *
+ * ВАЖНО: фильтр режет поле по ИМЕНИ целиком. Из-за этого уже терялись
+ * диагностические поля telegramKey и knownTokens — в них нет ничего
+ * секретного, но под маску попадали. Поэтому безопасные счётчики и
+ * вердикты называются нейтрально: candidates, telegramSignature.
  */
+const SENSITIVE_FIELD = /init_?data|token|secret|password|link|url|uuid|key/i;
+
 export function log(scope: string, message: string, extra?: Record<string, unknown>): void {
   const safe: Record<string, unknown> = {};
+  const dropped: string[] = [];
   for (const [key, value] of Object.entries(extra ?? {})) {
-    if (/init_?data|token|secret|password|link|url|uuid|key/i.test(key)) continue;
+    if (SENSITIVE_FIELD.test(key)) {
+      dropped.push(key);
+      continue;
+    }
     safe[key] = value;
   }
   // console.info попадает в логи Vercel и ничего не ломает в рантайме.
   console.info(`[${scope}] ${message}`, Object.keys(safe).length > 0 ? safe : '');
+  // Сами имена отброшенных полей безопасны и помогают заметить,
+  // что диагностика молчит из-за маски, а не из-за отсутствия данных.
+  if (dropped.length > 0) console.info(`[${scope}] скрыто полей по маске: ${dropped.join(', ')}`);
 }
 
 export function logError(scope: string, message: string, error: unknown): void {
