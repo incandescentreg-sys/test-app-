@@ -71,6 +71,13 @@ interface TgWebApp {
   themeParams: TgThemeParams;
   viewportHeight: number;
   viewportStableHeight: number;
+  /**
+   * Отступ, который Telegram требует оставить под её служебной шапкой
+   * (Bot API 7.7+). Раньше доступен только как CSS-переменная, поэтому
+   * читаем оба источника: JS-знашение надёжнее на старых клиентах.
+   */
+  contentSafeAreaInsetTop?: number;
+  contentSafeAreaInsetBottom?: number;
   isExpanded: boolean;
   BackButton: TgBackButton;
   MainButton: TgMainButton;
@@ -206,8 +213,32 @@ function setVar(name: string, value: string): void {
   root()?.style.setProperty(name, value);
 }
 
+/**
+ * Высота служебной панели Telegram, когда клиент не отдал inset.
+ *
+ * Панель с кнопкой «Закрыть» рисуется поверх WebView всегда, когда
+ * приложение развёрнуто на весь экран, а её высоту клиент в API не
+ * отдаёт. 56px — высота панели на телефонах; на них наезд заметнее всего.
+ */
+const TOPBAR_FALLBACK_PX = 56;
+
 export function syncViewportVars(): void {
   const wa = getWebApp();
+  const meta = readViewportInsets();
+
+  // Приложение разворачивается на весь экран (expand), поэтому контент
+  // заходит под служебную панель Telegram. Сообщают её двумя способами:
+  // CSS-переменной и свойством WebApp — берём больший.
+  const top =
+    Math.max(readTelegramInset('--tg-content-safe-area-inset-top'), wa?.contentSafeAreaInsetTop ?? 0) ||
+    (wa ? TOPBAR_FALLBACK_PX : meta.top);
+  const bottom =
+    Math.max(readTelegramInset('--tg-content-safe-area-inset-bottom'), wa?.contentSafeAreaInsetBottom ?? 0) ||
+    (wa ? TOPBAR_FALLBACK_PX : meta.bottom);
+
+  setVar('--safe-top', `${top}px`);
+  setVar('--safe-bottom', `${bottom}px`);
+
   if (!wa) return;
   try {
     // Telegram выставляет --tg-viewport-height / --tg-viewport-stable-height.
@@ -215,18 +246,6 @@ export function syncViewportVars(): void {
     const stable = wa.viewportStableHeight || wa.viewportHeight;
     if (stable) setVar('--tg-viewport-stable-height', `${stable}px`);
     if (wa.viewportHeight) setVar('--tg-viewport-height', `${wa.viewportHeight}px`);
-
-    // Safe area. Приложение разворачивается на весь экран (expand), поэтому
-    // контент заходит под служебную шапку Telegram. Отступ, который она
-    // требует, Telegram сообщает CSS-переменной
-    // --tg-content-safe-area-inset-top: игнорировать её нельзя, иначе наша
-    // шапка наезжает на кнопку закрытия.
-    const meta = readViewportInsets();
-    setVar('--safe-top', `${Math.max(meta.top, readTelegramInset('--tg-content-safe-area-inset-top'))}px`);
-    setVar(
-      '--safe-bottom',
-      `${Math.max(meta.bottom, readTelegramInset('--tg-content-safe-area-inset-bottom'))}px`,
-    );
   } catch (error) {
     logger.error(SCOPE, error);
   }
