@@ -18,7 +18,7 @@
 
 import { timingSafeEqual } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { prepare, readJson, sendError, sendOk, unauthorized, validation } from '../lib/http.js';
+import { methodNotAllowed, prepare, readJson, sendError, sendOk, unauthorized, validation } from '../lib/http.js';
 import { findPlan } from '../lib/plans.js';
 import { prisma } from '../lib/prisma.js';
 import { clientNameFor, fetchClient } from '../lib/h1vless.js';
@@ -45,7 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   try {
     if (req.method !== 'POST') {
-      return sendError(res, new Error('Method Not Allowed'), 'admin/provision');
+      throw methodNotAllowed();
     }
 
     const header = req.headers['x-admin-secret'];

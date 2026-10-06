@@ -19,7 +19,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { WEBHOOK_SECRET } from '../lib/env.js';
-import { ApiError, prepare, readJson, sendError, sendOk, unauthorized, validation } from '../lib/http.js';
+import { ApiError, methodNotAllowed, prepare, readJson, sendError, sendOk, unauthorized, validation } from '../lib/http.js';
 import { settleOrder } from '../lib/payments.js';
 import { prisma } from '../lib/prisma.js';
 
@@ -36,7 +36,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   try {
     if (req.method !== 'POST') {
-      return sendError(res, new Error('Method Not Allowed'), 'webhooks/payment');
+      throw methodNotAllowed();
     }
 
     const body = await readJson<{ orderId?: unknown; status?: unknown; secret?: unknown }>(req);

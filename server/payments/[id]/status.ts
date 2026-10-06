@@ -9,7 +9,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { prepare, sendError, sendOk, validation } from '../../lib/http.js';
+import { methodNotAllowed, prepare, sendError, sendOk, validation } from '../../lib/http.js';
 import { loadOrderStatus } from '../../lib/payments.js';
 import { requireAuth } from '../../lib/telegram.js';
 import { touchUser } from '../../lib/user.js';
@@ -19,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   try {
     if (req.method !== 'GET') {
-      return sendError(res, new Error('Method Not Allowed'), 'payments/status');
+      throw methodNotAllowed();
     }
 
     const auth = requireAuth(req);

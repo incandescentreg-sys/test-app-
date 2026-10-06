@@ -14,14 +14,14 @@ import {
   REFERRAL_BONUS_PERCENT,
   SUPPORT_USERNAME,
 } from './lib/env.js';
-import { prepare, sendError, sendOk } from './lib/http.js';
+import { methodNotAllowed, prepare, sendError, sendOk } from './lib/http.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (prepare(req, res)) return;
 
   try {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
-      return sendError(res, new Error('Method Not Allowed'), 'health');
+      throw methodNotAllowed();
     }
 
     sendOk(res, {

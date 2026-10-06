@@ -5,7 +5,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { prepare, sendError, sendOk } from './lib/http.js';
+import { methodNotAllowed, prepare, sendError, sendOk } from './lib/http.js';
 import { syncFromPanel, toSubscriptionDto } from './lib/subscription.js';
 import { requireAuth } from './lib/telegram.js';
 import { loadBundle } from './lib/user.js';
@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   try {
     if (req.method !== 'GET') {
-      return sendError(res, new Error('Method Not Allowed'), 'subscription');
+      throw methodNotAllowed();
     }
 
     const auth = requireAuth(req);

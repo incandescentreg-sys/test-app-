@@ -7,7 +7,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { BOT_USERNAME } from './lib/env.js';
-import { prepare, sendError, sendOk } from './lib/http.js';
+import { methodNotAllowed, prepare, sendError, sendOk } from './lib/http.js';
 import { prisma } from './lib/prisma.js';
 import { referralLinkFor } from './lib/referrals.js';
 import {
@@ -24,7 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   try {
     if (req.method !== 'GET') {
-      return sendError(res, new Error('Method Not Allowed'), 'me');
+      throw methodNotAllowed();
     }
 
     const auth = requireAuth(req);

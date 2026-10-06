@@ -42,6 +42,15 @@ export const validation = (message = 'Проверьте заполненные 
 export const rateLimited = (message = 'Слишком много запросов. Подождите немного.') =>
   new ApiError(429, 'RATE_LIMITED', message);
 
+/**
+ * 405, а не 500.
+ *
+ * Запрос неверным методом — это ошибка клиента, а не сервера. Раньше здесь
+ * бросался обычный Error, и неверный GET на POST-маршрут отдавал 500.
+ */
+export const methodNotAllowed = (): ApiError =>
+  new ApiError(405, 'METHOD_NOT_ALLOWED', 'Метод не поддерживается.');
+
 export const unavailable = (message = 'Сервис временно недоступен. Попробуйте ещё раз.') =>
   new ApiError(503, 'SERVICE_UNAVAILABLE', message);
 

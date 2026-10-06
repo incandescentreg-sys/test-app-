@@ -14,7 +14,7 @@
 import { randomBytes } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { CURRENCY, MIN_WITHDRAWAL_AMOUNT } from '../lib/env.js';
-import { ApiError, prepare, readJson, sendError, sendOk, validation } from '../lib/http.js';
+import { ApiError, methodNotAllowed, prepare, readJson, sendError, sendOk, validation } from '../lib/http.js';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth } from '../lib/telegram.js';
 import { touchUser } from '../lib/user.js';
@@ -50,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   try {
     if (req.method !== 'POST') {
-      return sendError(res, new Error('Method Not Allowed'), 'withdrawals/create');
+      throw methodNotAllowed();
     }
 
     const auth = requireAuth(req);

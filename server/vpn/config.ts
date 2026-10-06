@@ -10,7 +10,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ApiError, prepare, sendError, sendOk } from '../lib/http.js';
+import { ApiError, methodNotAllowed, prepare, sendError, sendOk } from '../lib/http.js';
 import { buildVpnConfig, computeStatus, isActive, syncFromPanel } from '../lib/subscription.js';
 import { requireAuth } from '../lib/telegram.js';
 import { loadBundle } from '../lib/user.js';
@@ -20,7 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   try {
     if (req.method !== 'GET') {
-      return sendError(res, new Error('Method Not Allowed'), 'vpn/config');
+      throw methodNotAllowed();
     }
 
     const auth = requireAuth(req);

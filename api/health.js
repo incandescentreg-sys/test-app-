@@ -35,6 +35,7 @@ var ApiError = class extends Error {
     this.code = code;
   }
 };
+var methodNotAllowed = () => new ApiError(405, "METHOD_NOT_ALLOWED", "\u041C\u0435\u0442\u043E\u0434 \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F.");
 function logError(scope, message, error) {
   const detail = error instanceof Error ? error.message : String(error);
   console.error(`[${scope}] ${message}: ${detail}`);
@@ -83,7 +84,7 @@ async function handler(req, res) {
   if (prepare(req, res)) return;
   try {
     if (req.method !== "GET" && req.method !== "HEAD") {
-      return sendError(res, new Error("Method Not Allowed"), "health");
+      throw methodNotAllowed();
     }
     sendOk(res, {
       ok: true,

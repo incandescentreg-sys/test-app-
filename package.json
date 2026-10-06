@@ -26,7 +26,9 @@
     "check:token": "tsx --env-file=server/.env scripts/check-token.ts",
     "verify:runtime": "tsx scripts/verify-runtime.ts",
     "build:functions": "tsx scripts/build-functions.ts",
-    "verify": "npm run typecheck && npm run typecheck:api && npm run test:initdata"
+    "verify": "npm run typecheck && npm run typecheck:api && npm run test:initdata",
+    "test:prod": "tsx scripts/test-prod.ts",
+    "db:seed:prod": "tsx scripts/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
