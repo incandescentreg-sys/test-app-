@@ -17,6 +17,7 @@ function num(name, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 var BOT_TOKEN = () => required("BOT_TOKEN");
+var BOT_TOKEN_FALLBACKS = () => optional("BOT_TOKEN_FALLBACKS").split(",").map((value) => value.trim()).filter((value) => value.length > 0 && value !== BOT_TOKEN());
 var INIT_DATA_MAX_AGE_SEC = () => num("INIT_DATA_MAX_AGE_SEC", 86400);
 var H1VLESS_BASE_URL = () => optional("H1VLESS_BASE_URL", "http://nl6.h1cloud.net:25108").replace(/\/+$/, "");
 var H1VLESS_TOKEN = () => optional("H1VLESS_TOKEN");
@@ -313,9 +314,23 @@ function validateInitData(initData) {
   params.delete("signature");
   const pairs = [...params.entries()].sort((left, right) => left[0].localeCompare(right[0]));
   const dataCheckString = pairs.map(([key, value]) => `${key}=${value}`).join("\n");
-  const secret = createHmac("sha256", "WebAppData").update(BOT_TOKEN()).digest();
-  const expected = createHmac("sha256", secret).update(dataCheckString).digest("hex");
-  if (!safeEqual(expected, hash)) throw unauthorized();
+  const tokens = [BOT_TOKEN(), ...BOT_TOKEN_FALLBACKS()];
+  let matched = false;
+  for (const token of tokens) {
+    const secret = createHmac("sha256", "WebAppData").update(token).digest();
+    const expected = createHmac("sha256", secret).update(dataCheckString).digest("hex");
+    if (safeEqual(expected, hash)) {
+      matched = true;
+      break;
+    }
+  }
+  if (!matched) {
+    log("telegram", "\u043F\u043E\u0434\u043F\u0438\u0441\u044C \u043D\u0435 \u0441\u043E\u0432\u043F\u0430\u043B\u0430 \u043D\u0438 \u0441 \u043E\u0434\u043D\u0438\u043C \u0442\u043E\u043A\u0435\u043D\u043E\u043C", {
+      fields: pairs.map(([key]) => key).sort(),
+      knownTokens: tokens.length
+    });
+    throw unauthorized();
+  }
   const authDate = Number(params.get("auth_date") ?? "0");
   if (!Number.isFinite(authDate) || authDate <= 0) throw unauthorized();
   const ageSec = Math.floor(Date.now() / 1e3) - authDate;

@@ -15,8 +15,8 @@
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { VercelRequest } from '@vercel/node';
-import { BOT_TOKEN, INIT_DATA_MAX_AGE_SEC } from './env.js';
-import { unauthorized } from './http.js';
+import { BOT_TOKEN, BOT_TOKEN_FALLBACKS, INIT_DATA_MAX_AGE_SEC } from './env.js';
+import { log, unauthorized } from './http.js';
 
 /** Заголовок, в котором Mini App передаёт подписанные данные. */
 export const AUTH_HEADER = 'X-Telegram-Init-Data';
@@ -70,10 +70,30 @@ export function validateInitData(initData: string): TelegramAuth {
   const pairs = [...params.entries()].sort((left, right) => left[0].localeCompare(right[0]));
   const dataCheckString = pairs.map(([key, value]) => `${key}=${value}`).join('\n');
 
-  const secret = createHmac('sha256', 'WebAppData').update(BOT_TOKEN()).digest();
-  const expected = createHmac('sha256', secret).update(dataCheckString).digest('hex');
+  // Подпись проверяется по каждому известному токену. При ротации токена
+  // в Telegram старый ещё какое-то время приходит от уже открытых
+  // приложений: без запасного варианта все они вылетели бы в
+  // «сессия истекла», хотя новый токен уже выдан.
+  const tokens = [BOT_TOKEN(), ...BOT_TOKEN_FALLBACKS()];
+  let matched = false;
 
-  if (!safeEqual(expected, hash)) throw unauthorized();
+  for (const token of tokens) {
+    const secret = createHmac('sha256', 'WebAppData').update(token).digest();
+    const expected = createHmac('sha256', secret).update(dataCheckString).digest('hex');
+    if (safeEqual(expected, hash)) {
+      matched = true;
+      break;
+    }
+  }
+
+  if (!matched) {
+    // Логируем только форму запроса: ни подпись, ни токен в лог не попадают.
+    log('telegram', 'подпись не совпала ни с одним токеном', {
+      fields: pairs.map(([key]) => key).sort(),
+      knownTokens: tokens.length,
+    });
+    throw unauthorized();
+  }
 
   const authDate = Number(params.get('auth_date') ?? '0');
   if (!Number.isFinite(authDate) || authDate <= 0) throw unauthorized();

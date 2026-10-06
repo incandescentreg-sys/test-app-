@@ -38,6 +38,20 @@ function bool(name: string, fallback = false): boolean {
 /** Токен бота. Секрет: только в env backend, никогда во фронтенде. */
 export const BOT_TOKEN = (): string => required('BOT_TOKEN');
 
+/**
+ * Запасные токены бота через запятую.
+ *
+ * Нужны для ротации без простоя. Telegram подписывает initData тем токеном,
+ * который выдал последним, а если сервер знает только предыдущий, все
+ * открытые приложения получают «сессия истекла». Список снимает проблему:
+ * при смене токена достаточно дописать новый, старый можно убрать позже.
+ */
+export const BOT_TOKEN_FALLBACKS = (): string[] =>
+  optional('BOT_TOKEN_FALLBACKS')
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0 && value !== BOT_TOKEN());
+
 /** Username бота без @ — для сборки реферальных ссылок. */
 export const BOT_USERNAME = (): string => optional('BOT_USERNAME', 'YablokoVPNBot').replace(/^@/, '');
 

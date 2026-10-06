@@ -299,8 +299,11 @@ async function main(): Promise<void> {
         String(r.body?.message ?? ''),
       );
 
+      // Пока оплата выключена, проверка PAYMENTS_ENABLED стоит перед поиском
+// тарифа, поэтому даже несуществующий planId даёт 503, а не 422.
       const bad = await api('/payments/create', { method: 'POST', body: { planId: 'нет-такого' } });
-      check('несуществующий тариф → 422', bad.status === 422, `HTTP ${bad.status}`);
+      check('выключенная оплата важнее тарифа → 503', bad.status === 503, `HTTP ${bad.status}`);
+      check('тот же код PAYMENT_UNAVAILABLE', bad.body?.code === 'PAYMENT_UNAVAILABLE');
     }
 
     /* ── Ручная выдача подписки ──────────────────────────────────────── */

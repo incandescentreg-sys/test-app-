@@ -29,7 +29,8 @@
     "verify": "npm run typecheck && npm run typecheck:api && npm run test:initdata",
     "test:prod": "tsx scripts/test-prod.ts",
     "db:seed:prod": "tsx scripts/seed.ts",
-    "check:auth": "tsx scripts/check-auth.ts"
+    "check:auth": "tsx scripts/check-auth.ts",
+    "rotate:secrets": "tsx scripts/rotate-secrets.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

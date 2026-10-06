@@ -28,8 +28,13 @@ function check(label: string, condition: boolean, detail = ''): void {
   }
 }
 
-/** Собирает initData так же, как это делает Telegram. */
-function buildInitData(user: Record<string, unknown>, extra: Record<string, string> = {}, authDate = Math.floor(Date.now() / 1000)): string {
+/** Подпись initData заданным токеном — как это делает Telegram. */
+function buildInitDataWith(
+  token: string,
+  user: Record<string, unknown>,
+  extra: Record<string, string> = {},
+  authDate = Math.floor(Date.now() / 1000),
+): string {
   const params: Record<string, string> = {
     auth_date: String(authDate),
     query_id: 'AAHdF6IQAAAAAN0XohDhrOrc',
@@ -42,10 +47,29 @@ function buildInitData(user: Record<string, unknown>, extra: Record<string, stri
     .map(([key, value]) => `${key}=${value}`)
     .join('\n');
 
-  const secret = createHmac('sha256', 'WebAppData').update(BOT_TOKEN).digest();
+  const secret = createHmac('sha256', 'WebAppData').update(token).digest();
   const hash = createHmac('sha256', secret).update(dataCheckString).digest('hex');
 
   return `${new URLSearchParams({ ...params, hash }).toString()}`;
+}
+
+/** Собирает initData так же, как это делает Telegram. */
+function buildInitData(
+  user: Record<string, unknown>,
+  extra: Record<string, string> = {},
+  authDate = Math.floor(Date.now() / 1000),
+): string {
+  return buildInitDataWith(BOT_TOKEN, user, extra, authDate);
+}
+
+/** true, если подпись принята. */
+function accepted(initData: string): boolean {
+  try {
+    validateInitData(initData);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const user = {
@@ -125,6 +149,21 @@ expectUnauthorized('нет поля hash', 'auth_date=123&user=%7B%22id%22%3A1%7
 }
 
 expectUnauthorized('битый user отвергается', buildInitData({}));
+
+/* ── Запасные токены ────────────────────────────────────────────────────── */
+console.log('\nРотация токена бота:');
+
+// Старый токен в списке запасных — подпись, сделанная им, должна пройти.
+const OLD_TOKEN = '111111111:AAOldTokenBeforeRotation00000000000';
+process.env.BOT_TOKEN_FALLBACKS = OLD_TOKEN;
+
+check('подпись старого токена принимается', Boolean(validateInitData(buildInitDataWith(OLD_TOKEN, user))));
+check('подпись нового токена принимается', Boolean(validateInitData(buildInitDataWith(BOT_TOKEN, user))));
+check('подпись чужого токена отвергается', !accepted(buildInitDataWith('222222222:AANewTokenSomebodyElse00000000000', user)));
+
+delete process.env.BOT_TOKEN_FALLBACKS;
+check('без запасных работает только основной токен', Boolean(validateInitData(buildInitData(user))));
+expectUnauthorized('чужая подпись без запасных', buildInitDataWith('222222222:AANewTokenSomebodyElse00000000000', user));
 
 /* ── Разбор ref-кода ─────────────────────────────────────────────────────── */
 console.log('\nРазбор реферального кода:');
