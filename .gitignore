@@ -23,8 +23,12 @@ pnpm-debug.log*
 server/.env*
 !server/.env.example
 
-# Функции для Vercel собираются из server/ скриптом build:functions.
-/api
+# Каталог api/ НЕ игнорируется: собранные функции лежат в репозитории.
+# Vercel находит Serverless Functions по файлам в api/ ДО запуска
+# buildCommand, поэтому функции, генерируемые только на сервере, он не
+# видит и падает с «doesn't match any Serverless Functions».
+# Файлы пересобираются скриптом build:functions на каждой сборке —
+# коммит нужен лишь для обнаружения маршрутов.
 
 .DS_Store
 Thumbs.db
