@@ -28,18 +28,18 @@ type Handler = (req: any, res: any) => Promise<void> | void;
 
 /** Таблица маршрутов: путь → модуль с default-экспортом. */
 const ROUTES: Array<[RegExp, string]> = [
-  [/^\/api\/health$/, 'api/health.ts'],
-  [/^\/api\/me\/profile$/, 'api/me/profile.ts'],
-  [/^\/api\/me$/, 'api/me.ts'],
-  [/^\/api\/plans$/, 'api/plans.ts'],
-  [/^\/api\/subscription$/, 'api/subscription.ts'],
-  [/^\/api\/payments\/create$/, 'api/payments/create.ts'],
-  [/^\/api\/payments\/([^/]+)\/status$/, 'api/payments/[id]/status.ts'],
-  [/^\/api\/vpn\/config$/, 'api/vpn/config.ts'],
-  [/^\/api\/referrals\/stats$/, 'api/referrals/stats.ts'],
-  [/^\/api\/withdrawals\/create$/, 'api/withdrawals/create.ts'],
-  [/^\/api\/webhooks\/payment$/, 'api/webhooks/payment.ts'],
-  [/^\/api\/admin\/provision$/, 'api/admin/provision.ts'],
+  [/^\/api\/health$/, 'server/health.ts'],
+  [/^\/api\/me\/profile$/, 'server/me/profile.ts'],
+  [/^\/api\/me$/, 'server/me.ts'],
+  [/^\/api\/plans$/, 'server/plans.ts'],
+  [/^\/api\/subscription$/, 'server/subscription.ts'],
+  [/^\/api\/payments\/create$/, 'server/payments/create.ts'],
+  [/^\/api\/payments\/([^/]+)\/status$/, 'server/payments/[id]/status.ts'],
+  [/^\/api\/vpn\/config$/, 'server/vpn/config.ts'],
+  [/^\/api\/referrals\/stats$/, 'server/referrals/stats.ts'],
+  [/^\/api\/withdrawals\/create$/, 'server/withdrawals/create.ts'],
+  [/^\/api\/webhooks\/payment$/, 'server/webhooks/payment.ts'],
+  [/^\/api\/admin\/provision$/, 'server/admin/provision.ts'],
 ];
 
 const MIME: Record<string, string> = {

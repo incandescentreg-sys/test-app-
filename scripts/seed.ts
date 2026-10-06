@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { DEFAULT_PLANS } from '../api/lib/plans.ts';
+import { DEFAULT_PLANS } from '../server/lib/plans.ts';
 
 const prisma = new PrismaClient();
 

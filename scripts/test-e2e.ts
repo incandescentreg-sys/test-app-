@@ -27,8 +27,8 @@ import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 
-import { prisma } from '../api/lib/prisma.ts';
-import { clientNameFor } from '../api/lib/h1vless.ts';
+import { prisma } from '../server/lib/prisma.ts';
+import { clientNameFor } from '../server/lib/h1vless.ts';
 import { createDevResponse } from './_devResponse.ts';
 
 const BOT_TOKEN = process.env.BOT_TOKEN ?? '';
@@ -118,17 +118,17 @@ async function api(
 
 async function startServer(): Promise<() => Promise<void>> {
   const routes: Array<[RegExp, string]> = [
-    [/^\/api\/health$/, 'api/health.ts'],
-    [/^\/api\/me\/profile$/, 'api/me/profile.ts'],
-    [/^\/api\/me$/, 'api/me.ts'],
-    [/^\/api\/plans$/, 'api/plans.ts'],
-    [/^\/api\/subscription$/, 'api/subscription.ts'],
-    [/^\/api\/payments\/create$/, 'api/payments/create.ts'],
-    [/^\/api\/payments\/([^/]+)\/status$/, 'api/payments/[id]/status.ts'],
-    [/^\/api\/vpn\/config$/, 'api/vpn/config.ts'],
-    [/^\/api\/referrals\/stats$/, 'api/referrals/stats.ts'],
-    [/^\/api\/withdrawals\/create$/, 'api/withdrawals/create.ts'],
-    [/^\/api\/admin\/provision$/, 'api/admin/provision.ts'],
+    [/^\/api\/health$/, 'server/health.ts'],
+    [/^\/api\/me\/profile$/, 'server/me/profile.ts'],
+    [/^\/api\/me$/, 'server/me.ts'],
+    [/^\/api\/plans$/, 'server/plans.ts'],
+    [/^\/api\/subscription$/, 'server/subscription.ts'],
+    [/^\/api\/payments\/create$/, 'server/payments/create.ts'],
+    [/^\/api\/payments\/([^/]+)\/status$/, 'server/payments/[id]/status.ts'],
+    [/^\/api\/vpn\/config$/, 'server/vpn/config.ts'],
+    [/^\/api\/referrals\/stats$/, 'server/referrals/stats.ts'],
+    [/^\/api\/withdrawals\/create$/, 'server/withdrawals/create.ts'],
+    [/^\/api\/admin\/provision$/, 'server/admin/provision.ts'],
   ];
 
   const server = createServer((req, res) => {

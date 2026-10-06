@@ -14,6 +14,6 @@
     "noUncheckedIndexedAccess": true,
     "strict": true
   },
-  "include": ["api/**/*.ts", "scripts/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["server/**/*.ts", "scripts/**/*.ts"],
+  "exclude": ["node_modules", "dist", "api"]
 }

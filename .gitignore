@@ -18,8 +18,13 @@ pnpm-debug.log*
 .env*
 !.env.example
 
-api/.env*
-!api/.env.example
+# Локальное окружение backend — рядом с исходниками, потому что api/
+# генерируется при сборке и очищается целиком.
+server/.env*
+!server/.env.example
+
+# Функции для Vercel собираются из server/ скриптом build:functions.
+/api
 
 .DS_Store
 Thumbs.db
