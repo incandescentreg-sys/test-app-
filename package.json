@@ -31,8 +31,7 @@
     "db:seed:prod": "tsx scripts/seed.ts",
     "check:auth": "tsx scripts/check-auth.ts",
     "rotate:secrets": "tsx scripts/rotate-secrets.ts",
-    "test:ed25519": "tsx scripts/test-ed25519.ts",
-    "diag:hash": "tsx scripts/diag-hash-style.ts"
+    "test:ed25519": "tsx scripts/test-ed25519.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

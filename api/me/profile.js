@@ -16,12 +16,6 @@ function num(name, fallback) {
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
-function bool(name, fallback = false) {
-  const raw = optional(name).toLowerCase();
-  if (raw === "true" || raw === "1" || raw === "yes") return true;
-  if (raw === "false" || raw === "0" || raw === "no") return false;
-  return fallback;
-}
 var BOT_TOKEN = () => required("BOT_TOKEN");
 var BOT_TOKEN_FALLBACKS = () => optional("BOT_TOKEN_FALLBACKS").split(",").map((value) => value.trim()).filter((value) => value.length > 0 && value !== BOT_TOKEN());
 var BOT_USERNAME = () => optional("BOT_USERNAME", "YablokoVPNBot").replace(/^@/, "");
@@ -37,7 +31,6 @@ var REFERRAL_BONUS_PERCENT = () => num("REFERRAL_BONUS_PERCENT", 20);
 var EXPIRING_SOON_DAYS = () => num("EXPIRING_SOON_DAYS", 5);
 var DEVICE_LIMIT = () => num("DEVICE_LIMIT", 0);
 var TRAFFIC_LIMIT_GB = () => num("TRAFFIC_LIMIT_GB", 0);
-var DEBUG_INITDATA = () => bool("DEBUG_INITDATA", false);
 var ALLOWED_ORIGINS = () => optional("ALLOWED_ORIGINS").split(",").map((s) => s.trim()).filter(Boolean);
 
 // server/lib/http.ts
@@ -441,35 +434,14 @@ function buildEd25519Key(hexKey) {
     return null;
   }
 }
-function hashCandidates(token, botId, pairs) {
-  const body = pairs.map(([key, value]) => `${key}=${value}`).join("\n");
-  const secrets = [
-    ["secret=HMAC(WebAppData,token)", createHmac("sha256", "WebAppData").update(token).digest()],
-    ["secret=HMAC(token,WebAppData)", createHmac("sha256", token).update("WebAppData").digest()],
-    ["secret=WebAppData", "WebAppData"],
-    ["secret=token", token],
-    ["secret=botId:WebAppData", `${botId}:WebAppData`]
-  ];
-  const strings = [
-    ["\u0441\u0442\u0440\u043E\u043A\u0430=\u043F\u043E\u043B\u044F", body],
-    ["\u0441\u0442\u0440\u043E\u043A\u0430=\u043F\u043E\u043B\u044F+\\n", `${body}
-`],
-    ["\u0441\u0442\u0440\u043E\u043A\u0430=botId:WebAppData+\u043F\u043E\u043B\u044F", `${botId}:WebAppData
-${body}`],
-    ["\u0441\u0442\u0440\u043E\u043A\u0430=WebAppData+\u043F\u043E\u043B\u044F", `WebAppData
-${body}`]
-  ];
-  const result = [];
-  for (const [secretName, secret] of secrets) {
-    for (const [stringName, value] of strings) {
-      result.push([`${secretName} + ${stringName}`, createHmac("sha256", secret).update(value).digest("hex")]);
-      result.push([
-        `${secretName} + ${stringName} (\u043E\u0431\u0440\u0430\u0442\u043D\u044B\u0439 \u043F\u043E\u0440\u044F\u0434\u043E\u043A)`,
-        createHmac("sha256", value).update(secret).digest("hex")
-      ]);
-    }
+function matchesTokenHash(tokens, pairs, hash) {
+  const dataCheckString = pairs.map(([key, value]) => `${key}=${value}`).join("\n");
+  for (const token of tokens) {
+    const secret = createHmac("sha256", "WebAppData").update(token).digest();
+    const expected = createHmac("sha256", secret).update(dataCheckString).digest("hex");
+    if (safeEqual(expected, hash)) return true;
   }
-  return result;
+  return false;
 }
 function verifyWithTelegramKey(botId, fields, signature) {
   if (!signature) return "absent";
@@ -501,29 +473,16 @@ function validateInitData(initData) {
   params.delete("hash");
   params.delete("signature");
   const pairs = [...params.entries()].sort((left, right) => left[0].localeCompare(right[0]));
-  const dataCheckString = pairs.map(([key, value]) => `${key}=${value}`).join("\n");
   const tokens = [BOT_TOKEN(), ...BOT_TOKEN_FALLBACKS()];
-  let matched = false;
-  let matchedBy = "";
-  for (const token of tokens) {
-    const botId = token.split(":")[0] ?? "";
-    for (const [name, candidate] of hashCandidates(token, botId, pairs)) {
-      if (safeEqual(candidate, hash)) {
-        matched = true;
-        matchedBy = name;
-        break;
-      }
-    }
-    if (matched) break;
+  const botIds = tokens.map((token) => token.split(":")[0] ?? "").filter((botId) => botId.length > 0);
+  const viaToken = matchesTokenHash(tokens, pairs, hash);
+  let viaSignature = "absent";
+  for (const botId of botIds) {
+    viaSignature = verifyWithTelegramKey(botId, pairs, signature);
+    if (viaSignature === "ok") break;
   }
-  if (!matched) {
-    const botIds = tokens.map((token) => token.split(":")[0] ?? "").filter((botId) => botId.length > 0);
-    let ed25519 = "absent";
-    for (const botId of botIds) {
-      ed25519 = verifyWithTelegramKey(botId, pairs, signature);
-      if (ed25519 === "ok") break;
-    }
-    log("telegram", "\u043F\u043E\u0434\u043F\u0438\u0441\u044C \u043D\u0435 \u0441\u043E\u0432\u043F\u0430\u043B\u0430 \u043D\u0438 \u0441 \u043E\u0434\u043D\u0438\u043C \u0442\u043E\u043A\u0435\u043D\u043E\u043C", {
+  if (!viaToken && viaSignature !== "ok") {
+    log("telegram", "\u043F\u043E\u0434\u043F\u0438\u0441\u044C \u043D\u0435 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0430 \u043D\u0438 \u0442\u043E\u043A\u0435\u043D\u043E\u043C, \u043D\u0438 Telegram", {
       fields: pairs.map(([key]) => key).sort(),
       queryIdPrefix: (params.get("query_id") ?? "").slice(0, 12),
       expectedBotIds: botIds.join(","),
@@ -531,16 +490,8 @@ function validateInitData(initData) {
       signatureField: signature ? "\u0435\u0441\u0442\u044C" : "\u043D\u0435\u0442",
       // Имена полей подобраны так, чтобы фильтр масок в log() их не съел:
       // он отбрасывает всё, что содержит key, token, url, secret.
-      telegramSignature: ed25519,
-      matchedBy: matchedBy || "\u043D\u0438 \u043E\u0434\u0438\u043D \u0432\u0430\u0440\u0438\u0430\u043D\u0442 \u043D\u0435 \u0441\u043E\u0432\u043F\u0430\u043B",
-      candidates: tokens.length,
-      // Отладочный дамп включается переменной DEBUG_INITDATA на время разбора.
-      // Тело кодируется в base64, чтобы при выводе в лог не искажалось.
-      ...DEBUG_INITDATA() ? {
-        bodyB64: Buffer.from(dataCheckString, "utf8").toString("base64"),
-        gotHash: hash,
-        bodyLength: dataCheckString.length
-      } : {}
+      telegramSignature: viaSignature,
+      hashFromToken: viaToken ? "\u0441\u043E\u0448\u0451\u043B\u0441\u044F" : "\u043D\u0435 \u0441\u043E\u0432\u043F\u0430\u043B"
     });
     throw unauthorized();
   }

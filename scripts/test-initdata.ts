@@ -8,7 +8,7 @@
  * Запуск: npm.cmd run test:initdata
  */
 
-import { createHmac } from 'node:crypto';
+import { createHmac, generateKeyPairSync, sign } from 'node:crypto';
 import { validateInitData, parseReferralId } from '../server/lib/telegram.ts';
 
 const BOT_TOKEN = '7123456789:AAHfakeTokenForTestsOnly000';
@@ -164,6 +164,39 @@ check('подпись чужого токена отвергается', !accept
 delete process.env.BOT_TOKEN_FALLBACKS;
 check('без запасных работает только основной токен', Boolean(validateInitData(buildInitData(user))));
 expectUnauthorized('чужая подпись без запасных', buildInitDataWith('222222222:AANewTokenSomebodyElse00000000000', user));
+
+/* ── Второй официальный способ: подпись Telegram полем signature ───────────── */
+console.log('\nПодпись Telegram вместо токена:');
+
+// Проверить положительный случай здесь нельзя: подпись должна быть сделана
+// ключом Telegram, приватного от которого у нас нет, и подделать её нечем.
+// Проверяем поэтому обратное — что подпись не проходит, если настоящая.
+// Успешный случай на боевых данных подтверждает продамп в логах.
+
+/**
+ * initData с hash от чужого токена и подписью в поле signature.
+ *
+ * Именно такая комбинация приходит от реальных клиентов Telegram:
+ * подпись настоящая, а hash ни с одним нашим токеном не сходится.
+ * Со своей парой ключей она обязана быть отвергнута.
+ */
+function withSignature(signature: string): string {
+  const foreign = buildInitDataWith('222222222:AANewTokenSomebodyElse00000000000', user);
+  return `${foreign}&signature=${signature}`;
+}
+
+// Подпись своей парой ключей: формат верный, подпись не настоящая.
+const { privateKey } = generateKeyPairSync('ed25519');
+const dataCheckString = [
+  `auth_date=${Math.floor(Date.now() / 1000)}`,
+  `query_id=AAHdF6IQAAAAAN0XohDhrOrc`,
+  `user=${JSON.stringify(user, null, 0)}`,
+].join('\n');
+const fakeSignature = sign(null, Buffer.from(dataCheckString, 'utf8'), privateKey).toString('base64url');
+
+expectUnauthorized('hash чужого токена и подпись своего ключа не проходят', withSignature(fakeSignature));
+expectUnauthorized('hash чужого токена и мусор в подписи не проходят', withSignature('не-подпись'));
+expectUnauthorized('hash чужого токена и пустая подпись не проходят', withSignature(''));
 
 /* ── Разбор ref-кода ─────────────────────────────────────────────────────── */
 console.log('\nРазбор реферального кода:');

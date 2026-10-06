@@ -5,9 +5,23 @@
  * не принимает userId из тела запроса или query-параметров: клиент подделывает
  * всё, кроме HMAC-подписи, которую Telegram вычислил своим бот-токеном.
  *
- * Алгоритм (официальный, docs.telegram.org/bots/webapps):
- *   secret = HMAC_SHA256(key = "WebAppData", data = BOT_TOKEN)
- *   hash   = HMAC_SHA256(key = secret,        data = data_check_string)
+ * Telegram проверяем двумя официальными способами (docs.telegram.org/bots/webapps):
+ *
+ *   1. по токену бота, полем `hash`:
+ *        secret = HMAC_SHA256(key = "WebAppData", data = BOT_TOKEN)
+ *        hash   = HMAC_SHA256(key = secret,        data = data_check_string)
+ *
+ *   2. по подписи Telegram, полем `signature` (Bot API 7.0+):
+ *        data = "<bot_id>:WebAppData\n" + data_check_string
+ *        Ed25519(data) = signature
+ *
+ * Второй способ официально предназначен ровно для этого: он позволяет
+ * проверить данные, не имея токена бота. Подпись привязана к bot_id, так
+ * как он входит в подписываемую строку, — подделать её для чужого бота
+ * нельзя, а проверяем мы только те bot_id, чьи токены нам известны.
+ *
+ * Достаточно любого одного из двух: подпись присутствует не во всех
+ * клиентах, токен есть не всегда. Если сходятся оба — не беда.
  *
  * Здесь используется node:crypto — на edge-рантайме его нет, поэтому
  * функции живут в обычных Node-функциях Vercel.
@@ -15,12 +29,7 @@
 
 import { createHmac, createPublicKey, timingSafeEqual, verify as verifySignature, type KeyObject } from 'node:crypto';
 import type { VercelRequest } from '@vercel/node';
-import {
-  BOT_TOKEN,
-  BOT_TOKEN_FALLBACKS,
-  DEBUG_INITDATA,
-  INIT_DATA_MAX_AGE_SEC,
-} from './env.js';
+import { BOT_TOKEN, BOT_TOKEN_FALLBACKS, INIT_DATA_MAX_AGE_SEC } from './env.js';
 import { log, unauthorized } from './http.js';
 
 /** Заголовок, в котором Mini App передаёт подписанные данные. */
@@ -64,49 +73,26 @@ function buildEd25519Key(hexKey: string): KeyObject | null {
 }
 
 /**
- * Матрица способов вычислить hash.
+ * Проверка поля `hash` токеном бота.
  *
- * Официальная документация описывает один способ, и он не сходится с
- * реальными данными Telegram, поэтому перебираем варианты: разные
- * способы получить секрет из токена, разные формы строки и оба порядка
- * аргументов HMAC. Победа фиксируется в логе — это перебор вариантов
- * реализации, а не ослабление проверки.
+ * Возвращает true, если подпись сошлась хотя бы с одним известным токеном.
+ * При ротации токена в Telegram старый ещё какое-то время приходит от уже
+ * открытых приложений: без запасного варианта все они вылетели бы в
+ * «сессия истекла», хотя новый токен уже выдан.
  */
-function hashCandidates(
-  token: string,
-  botId: string,
+function matchesTokenHash(
+  tokens: string[],
   pairs: Array<[string, string]>,
-): Array<[string, string]> {
-  const body = pairs.map(([key, value]) => `${key}=${value}`).join('\n');
+  hash: string,
+): boolean {
+  const dataCheckString = pairs.map(([key, value]) => `${key}=${value}`).join('\n');
 
-  const secrets: Array<[string, Buffer | string]> = [
-    ['secret=HMAC(WebAppData,token)', createHmac('sha256', 'WebAppData').update(token).digest()],
-    ['secret=HMAC(token,WebAppData)', createHmac('sha256', token).update('WebAppData').digest()],
-    ['secret=WebAppData', 'WebAppData'],
-    ['secret=token', token],
-    ['secret=botId:WebAppData', `${botId}:WebAppData`],
-  ];
-
-  const strings: Array<[string, string]> = [
-    ['строка=поля', body],
-    ['строка=поля+\\n', `${body}\n`],
-    ['строка=botId:WebAppData+поля', `${botId}:WebAppData\n${body}`],
-    ['строка=WebAppData+поля', `WebAppData\n${body}`],
-  ];
-
-  const result: Array<[string, string]> = [];
-  for (const [secretName, secret] of secrets) {
-    for (const [stringName, value] of strings) {
-      // Оба порядка аргументов: в псевдокоде документации они перепутаны,
-      // и в каком-то из вариантов реализация может следовать им буквально.
-      result.push([`${secretName} + ${stringName}`, createHmac('sha256', secret).update(value).digest('hex')]);
-      result.push([
-        `${secretName} + ${stringName} (обратный порядок)`,
-        createHmac('sha256', value).update(secret).digest('hex'),
-      ]);
-    }
+  for (const token of tokens) {
+    const secret = createHmac('sha256', 'WebAppData').update(token).digest();
+    const expected = createHmac('sha256', secret).update(dataCheckString).digest('hex');
+    if (safeEqual(expected, hash)) return true;
   }
-  return result;
+  return false;
 }
 
 /**
@@ -189,46 +175,27 @@ export function validateInitData(initData: string): TelegramAuth {
 
   // Сортировка пар по ключу — требование Telegram к data_check_string.
   const pairs = [...params.entries()].sort((left, right) => left[0].localeCompare(right[0]));
-  const dataCheckString = pairs.map(([key, value]) => `${key}=${value}`).join('\n');
 
-  // Подпись проверяется по каждому известному токену. При ротации токена
-  // в Telegram старый ещё какое-то время приходит от уже открытых
-  // приложений: без запасного варианта все они вылетели бы в
-  // «сессия истекла», хотя новый токен уже выдан.
+  // Токены известны и действующие; из них берём и секрет для HMAC, и bot_id
+  // для подписи Telegram.
   const tokens = [BOT_TOKEN(), ...BOT_TOKEN_FALLBACKS()];
-  let matched = false;
-  // Имя варианта, который совпал: попадает в лог при отказе и позволяет
-  // понять, по какой формуле Telegram на самом деле считает hash.
-  let matchedBy = '';
+  const botIds = tokens
+    .map((token) => token.split(':')[0] ?? '')
+    .filter((botId) => botId.length > 0);
 
-  for (const token of tokens) {
-    const botId = token.split(':')[0] ?? '';
+  // Способ 1: подпись токеном бота, поле hash.
+  const viaToken = matchesTokenHash(tokens, pairs, hash);
 
-    for (const [name, candidate] of hashCandidates(token, botId, pairs)) {
-      if (safeEqual(candidate, hash)) {
-        matched = true;
-        matchedBy = name;
-        break;
-      }
-    }
-    if (matched) break;
+  // Способ 2: подпись Telegram, поле signature. Проверяем только по тем
+  // bot_id, чьи токены нам известны, — чужая подпись не пройдёт.
+  let viaSignature: 'ok' | 'mismatch' | 'absent' | 'unsupported' = 'absent';
+  for (const botId of botIds) {
+    viaSignature = verifyWithTelegramKey(botId, pairs, signature);
+    if (viaSignature === 'ok') break;
   }
 
-  if (!matched) {
-    // Проверяем подпись публичным ключом Telegram. Это независимая
-    // проверка: она говорит, подписаны ли данные нашим ботом, даже если
-    // токен в окружении не тот. Раз результата не знаем заранее,
-    // вердикт попадает в лог вместе с формой запроса.
-    const botIds = tokens
-      .map((token) => token.split(':')[0] ?? '')
-      .filter((botId) => botId.length > 0);
-    let ed25519: string = 'absent';
-    for (const botId of botIds) {
-      ed25519 = verifyWithTelegramKey(botId, pairs, signature);
-      if (ed25519 === 'ok') break;
-    }
-
-    log('telegram', 'подпись не совпала ни с одним токеном', {
+  if (!viaToken && viaSignature !== 'ok') {
+    log('telegram', 'подпись не подтверждена ни токеном, ни Telegram', {
       fields: pairs.map(([key]) => key).sort(),
       queryIdPrefix: (params.get('query_id') ?? '').slice(0, 12),
       expectedBotIds: botIds.join(','),
@@ -236,18 +203,8 @@ export function validateInitData(initData: string): TelegramAuth {
       signatureField: signature ? 'есть' : 'нет',
       // Имена полей подобраны так, чтобы фильтр масок в log() их не съел:
       // он отбрасывает всё, что содержит key, token, url, secret.
-      telegramSignature: ed25519,
-      matchedBy: matchedBy || 'ни один вариант не совпал',
-      candidates: tokens.length,
-      // Отладочный дамп включается переменной DEBUG_INITDATA на время разбора.
-      // Тело кодируется в base64, чтобы при выводе в лог не искажалось.
-      ...(DEBUG_INITDATA()
-        ? {
-            bodyB64: Buffer.from(dataCheckString, 'utf8').toString('base64'),
-            gotHash: hash,
-            bodyLength: dataCheckString.length,
-          }
-        : {}),
+      telegramSignature: viaSignature,
+      hashFromToken: viaToken ? 'сошёлся' : 'не совпал',
     });
     throw unauthorized();
   }

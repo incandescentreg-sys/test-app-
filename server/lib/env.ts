@@ -126,17 +126,6 @@ export const ADMIN_SECRET = (): string => optional('ADMIN_SECRET');
 /** Сколько живёт заказ в ожидании оплаты. */
 export const ORDER_TTL_MINUTES = (): number => num('ORDER_TTL_MINUTES', 30);
 
-/**
- * Временная отладка проверки initData.
- *
- * Пишет в лог data_check_string вместе с полученным hash: без этого
- * перебор вариантов строки невозможен. Сама строка секретом не является —
- * подписать что-то новое всё равно нельзя, нужен токен бота.
- *
- * После разбора проблемы переменную нужно снять с прода.
- */
-export const DEBUG_INITDATA = (): boolean => bool('DEBUG_INITDATA', false);
-
 /* ── CORS ────────────────────────────────────────────────────────────────── */
 
 /**
