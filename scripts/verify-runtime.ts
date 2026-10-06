@@ -13,9 +13,8 @@
  * Запуск: npx tsx scripts/verify-runtime.ts
  */
 
-import { mkdtempSync, mkdirSync, writeFileSync, cpSync, rmSync, readdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 
