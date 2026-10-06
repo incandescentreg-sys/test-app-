@@ -214,13 +214,37 @@ function setVar(name: string, value: string): void {
 }
 
 /**
- * Высота служебной панели Telegram, когда клиент не отдал inset.
+ * Высота строки служебной панели Telegram — «Закрыть», меню, точки.
  *
- * Панель с кнопкой «Закрыть» рисуется поверх WebView всегда, когда
- * приложение развёрнуто на весь экран, а её высоту клиент в API не
- * отдаёт. 56px — высота панели на телефонах; на них наезд заметнее всего.
+ * Высоту панели Telegram не отдаёт ни одним способом, поэтому приходится
+ * оценивать. Оценка складывается из двух известных величин: высоты
+ * статус-бара устройства (env(safe-area-inset-top), её отдаёт браузер) и
+ * высоты самой строки панели. Первая часть точная, вторая одинакова на
+ * всех телефонах.
  */
-const TOPBAR_FALLBACK_PX = 56;
+const TELEGRAM_BAR_PX = 48;
+
+/** Кэшируемый элемент-щуп: env() не читается из вычисленных стилей корня. */
+let envProbe: HTMLElement | null = null;
+
+function readEnvInset(which: 'top' | 'bottom'): number {
+  if (typeof document === 'undefined') return 0;
+  if (!envProbe) {
+    envProbe = document.createElement('div');
+    envProbe.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(envProbe);
+  }
+  const style = envProbe.style;
+  style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none';
+  style.paddingTop = '0px';
+  style.paddingBottom = '0px';
+  if (which === 'top') style.paddingTop = 'env(safe-area-inset-top, 0px)';
+  else style.paddingBottom = 'env(safe-area-inset-bottom, 0px)';
+
+  const computed = window.getComputedStyle(envProbe);
+  const value = Number.parseFloat(which === 'top' ? computed.paddingTop : computed.paddingBottom);
+  return Number.isFinite(value) ? value : 0;
+}
 
 export function syncViewportVars(): void {
   const wa = getWebApp();
@@ -228,13 +252,23 @@ export function syncViewportVars(): void {
 
   // Приложение разворачивается на весь экран (expand), поэтому контент
   // заходит под служебную панель Telegram. Сообщают её двумя способами:
-  // CSS-переменной и свойством WebApp — берём больший.
-  const top =
-    Math.max(readTelegramInset('--tg-content-safe-area-inset-top'), wa?.contentSafeAreaInsetTop ?? 0) ||
-    (wa ? TOPBAR_FALLBACK_PX : meta.top);
-  const bottom =
-    Math.max(readTelegramInset('--tg-content-safe-area-inset-bottom'), wa?.contentSafeAreaInsetBottom ?? 0) ||
-    (wa ? TOPBAR_FALLBACK_PX : meta.bottom);
+  // CSS-переменной и свойством WebApp — берём больший, а если не
+  // сообщили ни тем, ни другим, считаем сами: статус-бар устройства плюс
+  // высота строки панели. Вне Telegram ничего этого не нужно.
+  const top = wa
+    ? Math.max(
+        readTelegramInset('--tg-content-safe-area-inset-top'),
+        wa.contentSafeAreaInsetTop ?? 0,
+        readEnvInset('top') + TELEGRAM_BAR_PX,
+      )
+    : meta.top;
+  const bottom = wa
+    ? Math.max(
+        readTelegramInset('--tg-content-safe-area-inset-bottom'),
+        wa.contentSafeAreaInsetBottom ?? 0,
+        readEnvInset('bottom'),
+      )
+    : meta.bottom;
 
   setVar('--safe-top', `${top}px`);
   setVar('--safe-bottom', `${bottom}px`);
