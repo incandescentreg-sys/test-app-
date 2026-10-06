@@ -15,7 +15,12 @@
 
 import { createHmac, createPublicKey, timingSafeEqual, verify as verifySignature, type KeyObject } from 'node:crypto';
 import type { VercelRequest } from '@vercel/node';
-import { BOT_TOKEN, BOT_TOKEN_FALLBACKS, INIT_DATA_MAX_AGE_SEC } from './env.js';
+import {
+  BOT_TOKEN,
+  BOT_TOKEN_FALLBACKS,
+  DEBUG_INITDATA,
+  INIT_DATA_MAX_AGE_SEC,
+} from './env.js';
 import { log, unauthorized } from './http.js';
 
 /** Заголовок, в котором Mini App передаёт подписанные данные. */
@@ -200,6 +205,26 @@ export function validateInitData(initData: string): TelegramAuth {
       telegramSignature: ed25519,
       hashStyle: hashOverPrefixedString ? 'с префиксом bot_id' : 'только поля',
       candidates: tokens.length,
+      // Отладочный дамп включается переменной DEBUG_INITDATA на время разбора.
+      ...(DEBUG_INITDATA()
+        ? {
+            body: dataCheckString,
+            gotHash: hash.slice(0, 16),
+            plainHmac: createHmac('sha256', createHmac('sha256', 'WebAppData').update(tokens[0] as string).digest())
+              .update(dataCheckString)
+              .digest('hex')
+              .slice(0, 16),
+            prefixedHmac: createHmac(
+              'sha256',
+              createHmac('sha256', 'WebAppData').update(tokens[0] as string).digest(),
+            )
+              .update(thirdPartyDataCheckString((tokens[0] as string).split(':')[0] ?? '', pairs))
+              .digest('hex')
+              .slice(0, 16),
+            bodyLength: dataCheckString.length,
+            hashLength: hash.length,
+          }
+        : {}),
     });
     throw unauthorized();
   }

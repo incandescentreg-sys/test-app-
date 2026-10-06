@@ -29,6 +29,7 @@ var H1VLESS_TIMEOUT_MS = num("H1VLESS_TIMEOUT_MS", 12e3);
 var EXPIRING_SOON_DAYS = () => num("EXPIRING_SOON_DAYS", 5);
 var PAYMENTS_ENABLED = () => bool("PAYMENTS_ENABLED", false);
 var ORDER_TTL_MINUTES = () => num("ORDER_TTL_MINUTES", 30);
+var DEBUG_INITDATA = () => bool("DEBUG_INITDATA", false);
 var ALLOWED_ORIGINS = () => optional("ALLOWED_ORIGINS").split(",").map((s) => s.trim()).filter(Boolean);
 
 // server/lib/http.ts
@@ -304,7 +305,19 @@ function validateInitData(initData) {
       // он отбрасывает всё, что содержит key, token, url, secret.
       telegramSignature: ed25519,
       hashStyle: hashOverPrefixedString ? "\u0441 \u043F\u0440\u0435\u0444\u0438\u043A\u0441\u043E\u043C bot_id" : "\u0442\u043E\u043B\u044C\u043A\u043E \u043F\u043E\u043B\u044F",
-      candidates: tokens.length
+      candidates: tokens.length,
+      // Отладочный дамп включается переменной DEBUG_INITDATA на время разбора.
+      ...DEBUG_INITDATA() ? {
+        body: dataCheckString,
+        gotHash: hash.slice(0, 16),
+        plainHmac: createHmac("sha256", createHmac("sha256", "WebAppData").update(tokens[0]).digest()).update(dataCheckString).digest("hex").slice(0, 16),
+        prefixedHmac: createHmac(
+          "sha256",
+          createHmac("sha256", "WebAppData").update(tokens[0]).digest()
+        ).update(thirdPartyDataCheckString(tokens[0].split(":")[0] ?? "", pairs)).digest("hex").slice(0, 16),
+        bodyLength: dataCheckString.length,
+        hashLength: hash.length
+      } : {}
     });
     throw unauthorized();
   }
