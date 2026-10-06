@@ -64,6 +64,52 @@ function buildEd25519Key(hexKey: string): KeyObject | null {
 }
 
 /**
+ * Матрица способов вычислить hash.
+ *
+ * Официальная документация описывает один способ, и он не сходится с
+ * реальными данными Telegram, поэтому перебираем варианты: разные
+ * способы получить секрет из токена, разные формы строки и оба порядка
+ * аргументов HMAC. Победа фиксируется в логе — это перебор вариантов
+ * реализации, а не ослабление проверки.
+ */
+function hashCandidates(
+  token: string,
+  botId: string,
+  pairs: Array<[string, string]>,
+): Array<[string, string]> {
+  const body = pairs.map(([key, value]) => `${key}=${value}`).join('\n');
+
+  const secrets: Array<[string, Buffer | string]> = [
+    ['secret=HMAC(WebAppData,token)', createHmac('sha256', 'WebAppData').update(token).digest()],
+    ['secret=HMAC(token,WebAppData)', createHmac('sha256', token).update('WebAppData').digest()],
+    ['secret=WebAppData', 'WebAppData'],
+    ['secret=token', token],
+    ['secret=botId:WebAppData', `${botId}:WebAppData`],
+  ];
+
+  const strings: Array<[string, string]> = [
+    ['строка=поля', body],
+    ['строка=поля+\\n', `${body}\n`],
+    ['строка=botId:WebAppData+поля', `${botId}:WebAppData\n${body}`],
+    ['строка=WebAppData+поля', `WebAppData\n${body}`],
+  ];
+
+  const result: Array<[string, string]> = [];
+  for (const [secretName, secret] of secrets) {
+    for (const [stringName, value] of strings) {
+      // Оба порядка аргументов: в псевдокоде документации они перепутаны,
+      // и в каком-то из вариантов реализация может следовать им буквально.
+      result.push([`${secretName} + ${stringName}`, createHmac('sha256', secret).update(value).digest('hex')]);
+      result.push([
+        `${secretName} + ${stringName} (обратный порядок)`,
+        createHmac('sha256', value).update(secret).digest('hex'),
+      ]);
+    }
+  }
+  return result;
+}
+
+/**
  * Проверка подписи Telegram публичным ключом.
  *
  * Возвращает 'ok' | 'mismatch' | 'absent' | 'unsupported':
@@ -151,33 +197,21 @@ export function validateInitData(initData: string): TelegramAuth {
   // «сессия истекла», хотя новый токен уже выдан.
   const tokens = [BOT_TOKEN(), ...BOT_TOKEN_FALLBACKS()];
   let matched = false;
-  // Какой из двух вариантов строки совпал с hash — для диагностики.
-  let hashOverPrefixedString = false;
+  // Имя варианта, который совпал: попадает в лог при отказе и позволяет
+  // понять, по какой формуле Telegram на самом деле считает hash.
+  let matchedBy = '';
 
   for (const token of tokens) {
-    const secret = createHmac('sha256', 'WebAppData').update(token).digest();
-
-    // Основной вариант: только поля initData.
-    const expected = createHmac('sha256', secret).update(dataCheckString).digest('hex');
-    if (safeEqual(expected, hash)) {
-      matched = true;
-      break;
-    }
-
-    // Запасной вариант: Telegram считает hash по строке сторонней
-    // валидации, где в начале "<bot_id>:WebAppData" и перевод строки.
-    // Так делают клиенты, которым не нужен токен бота, и такой формат
-    // подтверждается полем signature.
     const botId = token.split(':')[0] ?? '';
-    if (botId) {
-      const withPrefix = thirdPartyDataCheckString(botId, pairs);
-      const prefixed = createHmac('sha256', secret).update(withPrefix).digest('hex');
-      if (safeEqual(prefixed, hash)) {
+
+    for (const [name, candidate] of hashCandidates(token, botId, pairs)) {
+      if (safeEqual(candidate, hash)) {
         matched = true;
-        hashOverPrefixedString = true;
+        matchedBy = name;
         break;
       }
     }
+    if (matched) break;
   }
 
   if (!matched) {
@@ -203,26 +237,15 @@ export function validateInitData(initData: string): TelegramAuth {
       // Имена полей подобраны так, чтобы фильтр масок в log() их не съел:
       // он отбрасывает всё, что содержит key, token, url, secret.
       telegramSignature: ed25519,
-      hashStyle: hashOverPrefixedString ? 'с префиксом bot_id' : 'только поля',
+      matchedBy: matchedBy || 'ни один вариант не совпал',
       candidates: tokens.length,
       // Отладочный дамп включается переменной DEBUG_INITDATA на время разбора.
+      // Тело кодируется в base64, чтобы при выводе в лог не искажалось.
       ...(DEBUG_INITDATA()
         ? {
-            body: dataCheckString,
-            gotHash: hash.slice(0, 16),
-            plainHmac: createHmac('sha256', createHmac('sha256', 'WebAppData').update(tokens[0] as string).digest())
-              .update(dataCheckString)
-              .digest('hex')
-              .slice(0, 16),
-            prefixedHmac: createHmac(
-              'sha256',
-              createHmac('sha256', 'WebAppData').update(tokens[0] as string).digest(),
-            )
-              .update(thirdPartyDataCheckString((tokens[0] as string).split(':')[0] ?? '', pairs))
-              .digest('hex')
-              .slice(0, 16),
+            bodyB64: Buffer.from(dataCheckString, 'utf8').toString('base64'),
+            gotHash: hash,
             bodyLength: dataCheckString.length,
-            hashLength: hash.length,
           }
         : {}),
     });

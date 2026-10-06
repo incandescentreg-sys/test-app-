@@ -236,6 +236,36 @@ function buildEd25519Key(hexKey) {
     return null;
   }
 }
+function hashCandidates(token, botId, pairs) {
+  const body = pairs.map(([key, value]) => `${key}=${value}`).join("\n");
+  const secrets = [
+    ["secret=HMAC(WebAppData,token)", createHmac("sha256", "WebAppData").update(token).digest()],
+    ["secret=HMAC(token,WebAppData)", createHmac("sha256", token).update("WebAppData").digest()],
+    ["secret=WebAppData", "WebAppData"],
+    ["secret=token", token],
+    ["secret=botId:WebAppData", `${botId}:WebAppData`]
+  ];
+  const strings = [
+    ["\u0441\u0442\u0440\u043E\u043A\u0430=\u043F\u043E\u043B\u044F", body],
+    ["\u0441\u0442\u0440\u043E\u043A\u0430=\u043F\u043E\u043B\u044F+\\n", `${body}
+`],
+    ["\u0441\u0442\u0440\u043E\u043A\u0430=botId:WebAppData+\u043F\u043E\u043B\u044F", `${botId}:WebAppData
+${body}`],
+    ["\u0441\u0442\u0440\u043E\u043A\u0430=WebAppData+\u043F\u043E\u043B\u044F", `WebAppData
+${body}`]
+  ];
+  const result = [];
+  for (const [secretName, secret] of secrets) {
+    for (const [stringName, value] of strings) {
+      result.push([`${secretName} + ${stringName}`, createHmac("sha256", secret).update(value).digest("hex")]);
+      result.push([
+        `${secretName} + ${stringName} (\u043E\u0431\u0440\u0430\u0442\u043D\u044B\u0439 \u043F\u043E\u0440\u044F\u0434\u043E\u043A)`,
+        createHmac("sha256", value).update(secret).digest("hex")
+      ]);
+    }
+  }
+  return result;
+}
 function verifyWithTelegramKey(botId, fields, signature) {
   if (!signature) return "absent";
   const payload = Buffer.from(thirdPartyDataCheckString(botId, fields), "utf8");
@@ -269,24 +299,17 @@ function validateInitData(initData) {
   const dataCheckString = pairs.map(([key, value]) => `${key}=${value}`).join("\n");
   const tokens = [BOT_TOKEN(), ...BOT_TOKEN_FALLBACKS()];
   let matched = false;
-  let hashOverPrefixedString = false;
+  let matchedBy = "";
   for (const token of tokens) {
-    const secret = createHmac("sha256", "WebAppData").update(token).digest();
-    const expected = createHmac("sha256", secret).update(dataCheckString).digest("hex");
-    if (safeEqual(expected, hash)) {
-      matched = true;
-      break;
-    }
     const botId = token.split(":")[0] ?? "";
-    if (botId) {
-      const withPrefix = thirdPartyDataCheckString(botId, pairs);
-      const prefixed = createHmac("sha256", secret).update(withPrefix).digest("hex");
-      if (safeEqual(prefixed, hash)) {
+    for (const [name, candidate] of hashCandidates(token, botId, pairs)) {
+      if (safeEqual(candidate, hash)) {
         matched = true;
-        hashOverPrefixedString = true;
+        matchedBy = name;
         break;
       }
     }
+    if (matched) break;
   }
   if (!matched) {
     const botIds = tokens.map((token) => token.split(":")[0] ?? "").filter((botId) => botId.length > 0);
@@ -304,19 +327,14 @@ function validateInitData(initData) {
       // Имена полей подобраны так, чтобы фильтр масок в log() их не съел:
       // он отбрасывает всё, что содержит key, token, url, secret.
       telegramSignature: ed25519,
-      hashStyle: hashOverPrefixedString ? "\u0441 \u043F\u0440\u0435\u0444\u0438\u043A\u0441\u043E\u043C bot_id" : "\u0442\u043E\u043B\u044C\u043A\u043E \u043F\u043E\u043B\u044F",
+      matchedBy: matchedBy || "\u043D\u0438 \u043E\u0434\u0438\u043D \u0432\u0430\u0440\u0438\u0430\u043D\u0442 \u043D\u0435 \u0441\u043E\u0432\u043F\u0430\u043B",
       candidates: tokens.length,
       // Отладочный дамп включается переменной DEBUG_INITDATA на время разбора.
+      // Тело кодируется в base64, чтобы при выводе в лог не искажалось.
       ...DEBUG_INITDATA() ? {
-        body: dataCheckString,
-        gotHash: hash.slice(0, 16),
-        plainHmac: createHmac("sha256", createHmac("sha256", "WebAppData").update(tokens[0]).digest()).update(dataCheckString).digest("hex").slice(0, 16),
-        prefixedHmac: createHmac(
-          "sha256",
-          createHmac("sha256", "WebAppData").update(tokens[0]).digest()
-        ).update(thirdPartyDataCheckString(tokens[0].split(":")[0] ?? "", pairs)).digest("hex").slice(0, 16),
-        bodyLength: dataCheckString.length,
-        hashLength: hash.length
+        bodyB64: Buffer.from(dataCheckString, "utf8").toString("base64"),
+        gotHash: hash,
+        bodyLength: dataCheckString.length
       } : {}
     });
     throw unauthorized();
