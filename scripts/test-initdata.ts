@@ -178,4 +178,4 @@ check('ноль → null', parseReferralId('ref_0') === null);
 check('пробелы обрезаются', parseReferralId('  ref_555  ') === 555);
 
 console.log(`\nИтог: ${passed} прошло, ${failed} провалено\n`);
-process.exit(failed === 0 ? 0 : 1);
+process.exitCode = (failed === 0 ? 0 : 1);

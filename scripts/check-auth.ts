@@ -149,7 +149,7 @@ async function main(): Promise<void> {
   }
 
   console.log(`\n${problems === 0 ? 'Проблем не найдено' : `Найдено проблем: ${problems}`}\n`);
-  process.exit(problems === 0 ? 0 : 1);
+  process.exitCode = (problems === 0 ? 0 : 1);
 }
 
 void main();

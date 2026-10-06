@@ -171,7 +171,7 @@ async function main(): Promise<void> {
   }
 
   console.log(`\nИтог: ${passed} прошло, ${failed} провалено\n`);
-  process.exit(failed === 0 ? 0 : 1);
+  process.exitCode = (failed === 0 ? 0 : 1);
 }
 
 void main();
